@@ -52,12 +52,12 @@ jobs:
             - name: Install dependencies
               run: |
                   pip install ".[dev,test]"
-            - name: Install  R dependencies
-              run: |
-                  install.packages("BiocManager")
-                  BiocManager::install(version = "3.16")
-                  BiocManager::install("MAST")
-              shell: Rscript {0}
+            - name: BiocManager
+              run: Rscript -e "install.packages('BiocManager')"
+            - name: BiocManager version
+              run: BiocManager::install(version = "3.16")
+            - name: MASTK
+              run: Rscript -e "BiocManager::install('MAST')"
             - name: Test
               env:
                   MPLBACKEND: agg
