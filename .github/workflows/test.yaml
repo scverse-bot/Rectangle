@@ -55,8 +55,8 @@ jobs:
             - name: BiocManager
               run: Rscript -e "install.packages('BiocManager')"
             - name: BiocManager version
-              run: BiocManager::install(version = "3.16")
-            - name: MASTK
+              run: Rscript -e "BiocManager::install(version = '3.16')"
+            - name: MAST
               run: Rscript -e "BiocManager::install('MAST')"
             - name: Test
               env:
