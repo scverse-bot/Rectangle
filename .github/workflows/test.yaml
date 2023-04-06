@@ -51,7 +51,7 @@ jobs:
                   pip install codecov
             - name: Install dependencies
               run: |
-                  Rscript install_dependencies.R
+                  Rscript ./install_dependencies.R
                   pip install ".[dev,test]"
             - name: Test
               env:
