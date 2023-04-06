@@ -51,8 +51,13 @@ jobs:
                   pip install codecov
             - name: Install dependencies
               run: |
-                  Rscript ./install_dependencies.R
                   pip install ".[dev,test]"
+            - name: Install  R dependencies
+              run: |
+                  install.packages("BiocManager")
+                  BiocManager::install(version = "3.16"
+                  BiocManager::install("MAST")
+              shell: Rscript {0}
             - name: Test
               env:
                   MPLBACKEND: agg
