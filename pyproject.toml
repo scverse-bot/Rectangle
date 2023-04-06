@@ -21,7 +21,8 @@ urls.Home-page = "https://github.com/bernheder/Rectangle"
 dependencies = [
     "anndata",
     # for debug logging (referenced from the issue template)
-    "session-info"
+    "session-info",
+    "rpy2"
 ]
 
 [project.optional-dependencies]

@@ -18,18 +18,22 @@ jobs:
             matrix:
                 python: ["3.10"]
                 os: [ubuntu-latest]
+                r: ["4.2"]
 
         env:
             OS: ${{ matrix.os }}
             PYTHON: ${{ matrix.python }}
-
+            R: ${{ matrix.r }}
         steps:
             - uses: actions/checkout@v2
             - name: Set up Python ${{ matrix.python }}
               uses: actions/setup-python@v2
               with:
                   python-version: ${{ matrix.python }}
-
+            - name: Set up R ${{ matrix.r }}
+              uses: r-lib/actions/setup-r@v1
+              with:
+                  r-version: ${{ matrix.r }}
             - name: Get pip cache dir
               id: pip-cache-dir
               run: |
@@ -47,6 +51,7 @@ jobs:
                   pip install codecov
             - name: Install dependencies
               run: |
+                  Rscript install_dependencies.R
                   pip install ".[dev,test]"
             - name: Test
               env:

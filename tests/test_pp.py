@@ -4,7 +4,8 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
-from src import rectangle
+
+import rectangle
 
 
 @pytest.fixture
@@ -25,6 +26,13 @@ def small_data_adata(small_data):
     sc_data, annotations = small_data
     annotations = pd.DataFrame(annotations, index=sc_data.columns)
     return ad.AnnData(X=sc_data.values.T, obs=annotations, var=pd.DataFrame(data=sc_data.index, index=sc_data.index))
+
+
+@pytest.fixture
+def mast_data(data_dir):
+    mast = pd.read_csv(data_dir / "df_for_mast.csv", index_col=0)
+    groups = np.array(np.repeat("cluster_other", 53).tolist() + np.repeat("cluster_1", 47).tolist())
+    return mast, groups
 
 
 @pytest.fixture
@@ -63,3 +71,12 @@ def test_stat_log2(log_data):
     input, expected = log_data
     actual = rectangle.pp.stat_log2(input, group_v, pseudo_count)
     assert np.isclose(expected, actual, rtol=1e-05, atol=1e-05).all()
+
+
+def test_create_data_for_mast(mast_data):
+    # import rpy2's package module
+    # R vector of strings
+
+    mast, groups = mast_data
+    result = rectangle.pp.create_data_for_mast(mast, groups)
+    assert str(result.typeof) == "RTYPES.S4SXP"

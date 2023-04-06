@@ -2,6 +2,10 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from rpy2 import robjects
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.conversion import localconverter
+from rpy2.robjects.packages import importr
 
 
 def make_pseudo_bulk_adata(adata: AnnData, group_size: int) -> AnnData:
@@ -56,6 +60,48 @@ def convert_to_cpm(count_sc_data):
 
 def mean_in_log2space(values, pseudo_count):
     return np.log2(np.mean(2**values - pseudo_count) + pseudo_count)
+
+
+def check_mast_install():
+    import rpy2.robjects.packages as rpackages
+
+    if not rpackages.isinstalled("BiocManager"):
+        utils = rpackages.importr("utils")
+        utils.chooseCRANmirror(ind=1)
+        print("BiocManager not installed, installing now")
+        utils.install_packages("BiocManager")
+        biocmanager = rpackages.importr("BiocManager")
+        biocmanager.install(version="3.16")
+    if not rpackages.isinstalled("MAST"):
+        utils = rpackages.importr("utils")
+        utils.chooseCRANmirror(ind=1)
+        print("MAST not installed, installing now")
+        print("This may take a few minutes...")
+        biocmanager = rpackages.importr("BiocManager")
+        biocmanager.install("MAST")
+
+
+def create_data_for_mast(counts, groups):
+    check_mast_install()
+    mast = importr("MAST")
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        f_data_r = robjects.conversion.py2rpy(pd.DataFrame(data={"primerid": counts.index}))
+        c_data_r = robjects.conversion.py2rpy(
+            pd.DataFrame(data={"wellKey": counts.T.index, "Population": groups, "ncells": 1})
+        )
+        counts_data_r = robjects.conversion.py2rpy(counts)
+    robjects.r.assign("counts.data", counts_data_r)
+    vbeta_fa = mast.FromMatrix(robjects.r("data.matrix(counts.data)"), c_data_r, f_data_r)
+    return vbeta_fa
+
+
+# TODO: would be great to find python equivalents to these methods
+def lr_test(annotation, log2_results, values_df, group):
+    create_data_for_mast(values_df, group)
+    # zlm_output = mast_zlm(mast_data)
+    # lr_values = mast_lrTest(zlm_output)
+    # lr_test_df = create_lr_test_df(annotation, log2_results, lr_values)
+    # return lr_test_df
 
 
 def stat_log2(values_df, group, pseudo_count):
