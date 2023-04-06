@@ -108,6 +108,6 @@ def stat_log2(values_df, group, pseudo_count):
     values_df_t = values_df.T
     values_df_t["group"] = group
     log2_mean_r = values_df_t.groupby("group").apply(lambda x: mean_in_log2space(x, pseudo_count)).T
-    log2_mean_r.columns = ["log2.mean.group0", "log2.mean.group1"]
-    log2_mean_r["log2_fc"] = log2_mean_r["log2.mean.group1"] - log2_mean_r["log2.mean.group0"]
+    log2_mean_r.columns = ["log2_group0", "log2_group1"]
+    log2_mean_r["log2_fc"] = log2_mean_r["log2_group1"] - log2_mean_r["log2_group0"]
     return log2_mean_r.drop("group")
