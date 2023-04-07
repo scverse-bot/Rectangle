@@ -127,8 +127,7 @@ def de_analysis(sc_data: pd.DataFrame, annotations: pd.Series):
     pseudo_count = 0.1
     data_log2 = np.log2(sc_data + pseudo_count)
     for annotation in np.unique(annotations):
-        mask = annotations == annotation
-        data_log2 = data_log2.loc[:, ~mask].join(data_log2.loc[:, mask])
+        data_log2 = data_log2.loc[:, annotations != annotation].join(data_log2.loc[:, annotations == annotation])
         group_log2 = np.array([1 if x else 0 for x in sorted(annotations == annotation)])
         log2_results = stat_log2(data_log2, group_log2, pseudo_count)
         genes_list = log2_results.index.tolist()
@@ -187,12 +186,6 @@ def mast_zlm(mast_data):
 def signature_creation(sc_data, annotations: pd.Series):
     print("signature creation")
     p_cutoff = 0.01
-    # remove unlabeled cells
-    annotations_mask = annotations is not None
-    sc_data = sc_data.loc[:, annotations_mask]
-    annotations = annotations[annotations_mask]
-    # remove unexpressed genes
-    sc_data = sc_data.loc[~(sc_data == 0).all(axis=1)]
 
     de_analysis_results = de_analysis(sc_data, annotations)
     de_analysis_adjusted = {}
