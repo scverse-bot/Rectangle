@@ -1,6 +1,7 @@
 import anndata as ad
 import numpy as np
 import pandas as pd
+import statsmodels.stats.multitest as multi
 from anndata import AnnData
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
@@ -59,7 +60,7 @@ def convert_to_cpm(count_sc_data):
 
 
 def mean_in_log2space(values, pseudo_count):
-    return np.log2(np.mean(2**values - pseudo_count) + pseudo_count)
+    return np.log2((2**values - pseudo_count).mean() + pseudo_count)
 
 
 def check_mast_install():
@@ -91,23 +92,120 @@ def create_data_for_mast(counts, groups):
         )
         counts_data_r = robjects.conversion.py2rpy(counts)
     robjects.r.assign("counts.data", counts_data_r)
-    vbeta_fa = mast.FromMatrix(robjects.r("data.matrix(counts.data)"), c_data_r, f_data_r)
-    return vbeta_fa
+    return mast.FromMatrix(robjects.r("data.matrix(counts.data)"), c_data_r, f_data_r)
 
 
-# TODO: would be great to find python equivalents to these methods
+def mast_lr_test(zlm_output):
+    mast = importr("MAST")
+    robjects.r.assign("zlm.lr", mast.lrTest(zlm_output, "Population"))
+    robjects.r.assign("zlm.lr", robjects.r('reshape2::melt(zlm.lr[, , "Pr(>Chisq)"])'))
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        zlm_lr_df = robjects.conversion.rpy2py(robjects.r('zlm.lr[which(zlm.lr$test.type == "hurdle"), ]'))
+    return zlm_lr_df
+
+
+def create_lr_test_df(annotation, de, lr_pval):
+    lr_test_df = lr_pval.merge(de, left_on="primerid", right_index=True)
+    lr_test_df.columns = [
+        "gene",
+        "test_type",
+        "p_val",
+        "log_mean_" + "cluster_other",
+        "log_mean_" + annotation,
+        "log2_fc",
+    ]
+    return lr_test_df
+
+
 def lr_test(annotation, log2_results, values_df, group):
-    create_data_for_mast(values_df, group)
-    # zlm_output = mast_zlm(mast_data)
-    # lr_values = mast_lrTest(zlm_output)
-    # lr_test_df = create_lr_test_df(annotation, log2_results, lr_values)
-    # return lr_test_df
+    zlm_output = mast_zlm(create_data_for_mast(values_df, group))
+    return create_lr_test_df(annotation, log2_results, mast_lr_test(zlm_output))
+
+
+def de_analysis(sc_data: pd.DataFrame, annotations: pd.Series):
+    test_results = {}
+    pseudo_count = 0.1
+    data_log2 = np.log2(sc_data + pseudo_count)
+    for annotation in np.unique(annotations):
+        mask = annotations == annotation
+        data_log2 = data_log2.loc[:, ~mask].join(data_log2.loc[:, mask])
+        group_log2 = np.array([1 if x else 0 for x in sorted(annotations == annotation)])
+        log2_results = stat_log2(data_log2, group_log2, pseudo_count)
+        genes_list = log2_results.index.tolist()
+        groups = np.array([annotation if x else "cluster_other" for x in group_log2])
+        test_result = lr_test(annotation, log2_results, data_log2.loc[genes_list], groups)
+        test_results[annotation] = test_result
+    return test_results
 
 
 def stat_log2(values_df, group, pseudo_count):
+    log_cutt_off = 0.5
     values_df_t = values_df.T
     values_df_t["group"] = group
-    log2_mean_r = values_df_t.groupby("group").apply(lambda x: mean_in_log2space(x, pseudo_count)).T
-    log2_mean_r.columns = ["log2_group0", "log2_group1"]
-    log2_mean_r["log2_fc"] = log2_mean_r["log2_group1"] - log2_mean_r["log2_group0"]
-    return log2_mean_r.drop("group")
+    log_mean_r = values_df_t.groupby("group").apply(lambda x: mean_in_log2space(x, pseudo_count)).T
+    log_mean_r.columns = ["log_g_zero", "log_g_one"]
+    log_mean_r["log2_fc"] = log_mean_r["log_g_one"] - log_mean_r["log_g_zero"]
+    log_mean_r = log_mean_r[log_mean_r["log2_fc"] > log_cutt_off]
+    return log_mean_r.drop("group")
+
+
+def create_condition_number_matrix(de_adjusted, sc_data, max_gene_number, annotations):
+    genes = [find_signature_genes(max_gene_number, de_adjusted[annotation]) for annotation in de_adjusted]
+    genes = list({gene for sublist in genes for gene in sublist})
+
+    signature_columns = {
+        annotation: sc_data.loc[genes, annotations == annotation].mean(axis=1) for annotation in de_adjusted
+    }
+
+    return pd.DataFrame(signature_columns)
+
+
+def create_condition_number_matrices(de_adjusted, sc_data, annotations):
+    max_gene_number = 50
+    condition_number_matrices = []
+    longest_de_analysis = max([len(de_adjusted[annotation]) for annotation in de_adjusted])
+    loop_range = max_gene_number + 1 if longest_de_analysis < max_gene_number else min(longest_de_analysis + 1, 200)
+    for i in range(max_gene_number, loop_range):
+        condition_number_matrices.append(create_condition_number_matrix(de_adjusted, sc_data, i, annotations))
+    return condition_number_matrices
+
+
+def find_signature_genes(number_of_genes, de_result):
+    result_len = len(de_result)
+    if result_len > 0:
+        number_of_genes = min(number_of_genes, result_len)
+        de_result = de_result.sort_values(by=["log2_fc"], ascending=False)
+        return de_result["gene"][0:number_of_genes].values
+    return []
+
+
+def mast_zlm(mast_data):
+    mast = importr("MAST")
+    return mast.zlm(robjects.Formula("~Population"), mast_data, method="bayesglm", ebayes=True)
+
+
+def signature_creation(sc_data, annotations: pd.Series):
+    print("signature creation")
+    p_cutoff = 0.01
+    # remove unlabeled cells
+    annotations_mask = annotations is not None
+    sc_data = sc_data.loc[:, annotations_mask]
+    annotations = annotations[annotations_mask]
+    # remove unexpressed genes
+    sc_data = sc_data.loc[~(sc_data == 0).all(axis=1)]
+
+    de_analysis_results = de_analysis(sc_data, annotations)
+    de_analysis_adjusted = {}
+
+    for annotation in annotations.unique():
+        de_analysis_result = de_analysis_results[annotation]
+        de_analysis_result["p_val_adjusted"] = multi.multipletests(de_analysis_result["p_val"], method="fdr_bh")[1]
+        de_analysis_adjusted[annotation] = de_analysis_result[
+            (de_analysis_result["p_val_adjusted"] < p_cutoff) & (de_analysis_result["log2_fc"] > 0.5)
+        ]
+
+    condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
+    condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
+    smallest_de_analysis = min([len(de_analysis_adjusted[annotation]) for annotation in de_analysis_adjusted])
+    optimal_condition_number = condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
+    return create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations)

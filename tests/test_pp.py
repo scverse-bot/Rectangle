@@ -22,6 +22,12 @@ def small_data(data_dir):
 
 
 @pytest.fixture
+def small_dwls_signature(data_dir):
+    small_dwls_signature = pd.read_csv(data_dir / "dwls_model_small.csv", index_col=0)
+    return small_dwls_signature
+
+
+@pytest.fixture
 def small_data_adata(small_data):
     sc_data, annotations = small_data
     annotations = pd.DataFrame(annotations, index=sc_data.columns)
@@ -33,6 +39,12 @@ def mast_data(data_dir):
     mast = pd.read_csv(data_dir / "df_for_mast.csv", index_col=0)
     groups = np.array(np.repeat("cluster_other", 53).tolist() + np.repeat("cluster_1", 47).tolist())
     return mast, groups
+
+
+@pytest.fixture
+def mast_lr_test_result(data_dir):
+    lr_result = pd.read_csv(data_dir / "lrTest.csv", index_col=0)
+    return lr_result
 
 
 @pytest.fixture
@@ -67,16 +79,40 @@ def test_pseudo_bulk_creation_adata(small_data_adata, small_data):
 
 def test_stat_log2(log_data):
     group_v = np.append(np.repeat([0], 53), np.repeat(1, 47))
-    pseudo_count = 0.1
     input, expected = log_data
-    actual = rectangle.pp.stat_log2(input, group_v, pseudo_count)
+    expected = expected[expected["log2_fc"] > 0.5]
+    actual = rectangle.pp.stat_log2(input, group_v, 0.1)
     assert np.isclose(expected, actual, rtol=1e-05, atol=1e-05).all()
 
 
 def test_create_data_for_mast(mast_data):
-    # import rpy2's package module
-    # R vector of strings
-
     mast, groups = mast_data
     result = rectangle.pp.create_data_for_mast(mast, groups)
     assert str(result.typeof) == "RTYPES.S4SXP"
+
+
+def test_create_mast_zlm(mast_data):
+    mast, groups = mast_data
+    mast_data = rectangle.pp.create_data_for_mast(mast, groups)
+    result = rectangle.pp.mast_zlm(mast_data)
+    assert str(result.typeof) == "RTYPES.S4SXP"
+
+
+def test_mast_lr_test(mast_data, mast_lr_test_result):
+    mast, groups = mast_data
+    mast_data = rectangle.pp.create_data_for_mast(mast, groups)
+    zlm = rectangle.pp.mast_zlm(mast_data)
+    result = rectangle.pp.mast_lr_test(zlm)
+    np.isclose(mast_lr_test_result["value"], result["value"], rtol=1e-4, atol=1e-4).all()
+
+
+def test_de_analysis(small_data):
+    result = rectangle.pp.de_analysis(small_data[0], small_data[1])
+    assert len(result) == 3
+
+
+def test_signature_creation(small_data, small_dwls_signature):
+    sc_data, annotations = small_data
+    actual = rectangle.pp.signature_creation(sc_data, annotations).sort_index()
+    expected = small_dwls_signature.sort_index()
+    assert np.isclose(expected, actual, rtol=1e-05, atol=1e-05).all()

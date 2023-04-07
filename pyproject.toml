@@ -22,7 +22,8 @@ dependencies = [
     "anndata",
     # for debug logging (referenced from the issue template)
     "session-info",
-    "rpy2"
+    "rpy2",
+    "statsmodels"
 ]
 
 [project.optional-dependencies]
