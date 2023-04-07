@@ -59,12 +59,23 @@ jobs:
                   libcurl4-openssl-dev libssl-dev libxml2-dev libfontconfig1-dev \
                   libharfbuzz-dev libfribidi-dev \
                   libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev -y
-            - name: BiocManager
-              run: Rscript -e "install.packages('BiocManager')"
-            - name: BiocManager version
-              run: Rscript -e "BiocManager::install(version = '3.16')"
-            - name: MAST
-              run: Rscript -e "BiocManager::install('MAST')"
+              # Cache R packages
+            - name: Cache R packages
+              uses: actions/cache@v2
+              with:
+                  path: ${{ env.R_LIBS_USER }}
+                  key: ${{ runner.os }}-${{ hashFiles('**/lock-files.R') }}
+                  restore-keys: ${{ runner.os }}-
+
+              # Cache RScript
+            - name: Cache RScript
+              uses: actions/cache@v2
+              with:
+                  path: scripts
+                  key: ${{ runner.os }}-${{ hashFiles('**/*.R') }}
+                  restore-keys: ${{ runner.os }}-
+            - name: Run RScript
+              run: Rscript scripts/rscript.R
             - name: Test
               env:
                   MPLBACKEND: agg
