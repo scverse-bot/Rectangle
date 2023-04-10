@@ -16,8 +16,8 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
     # Minimize     1/2 x^T G x - a^T x
     # Subject to   C.T x >= b
     if multiplier is None:
-        a = np.array(signature.T @ bulk)
-        G = np.array(signature.T @ signature)
+        a = np.dot(signature.T, bulk)
+        G = np.dot(signature.T, signature)
     else:
         weights = np.square(1 / (signature @ gld))
         weights_dampened = np.clip(scale_weights(weights), None, multiplier)
@@ -49,7 +49,6 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
     C = np.concatenate((C1, C2, *prev_constraints), axis=1)
     b = np.concatenate((b1, b2, *prev_b), axis=0)
 
-    # Solve the QP problem and return the solution
     scale = np.linalg.norm(G)
     solution = quadprog.solve_qp(G / scale, a / scale, C, b, factorized=False)
     return solution[0]

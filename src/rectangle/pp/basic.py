@@ -7,6 +7,7 @@ from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import importr
+from scipy.cluster.hierarchy import fcluster, linkage
 
 
 def make_pseudo_bulk_adata(adata: AnnData, group_size: int) -> AnnData:
@@ -183,6 +184,40 @@ def mast_zlm(mast_data):
     return mast.zlm(robjects.Formula("~Population"), mast_data, method="bayesglm", ebayes=True)
 
 
+def create_linkage_matrix(signature: pd.DataFrame):
+    method = "complete"
+    metric = "euclidean"
+    return linkage((np.log(signature + 1)).T, method=method, metric=metric)
+
+
+def create_fclusters(linkage_matrix, maxclust):
+    clusters = fcluster(linkage_matrix, criterion="maxclust", t=maxclust)
+    if len(set(clusters)) == 1:
+        # default clustering clustered all cell types in same cluster, fallback to distance metric
+        distance = linkage_matrix[0][2]
+        clusters = fcluster(linkage_matrix, criterion="distance", t=distance)
+    return clusters
+
+
+def get_fcluster_assignments(fclusters, signature_columns):
+    assignments = []
+    clusters = list(fclusters)
+    for cluster, cell in zip(fclusters, signature_columns):
+        if clusters.count(cluster) > 1:
+            assignments.append(cluster)
+        else:
+            assignments.append(cell)
+    return assignments
+
+
+def create_annotations_from_cluster_labels(labels, annotations, signature):
+    assert len(labels) == len(signature.columns)
+    label_dict = dict(zip(signature.columns, labels))
+    assert set(annotations) == set(signature.columns)
+    cluster_annotations = [str(label_dict[x]) for x in annotations]
+    return pd.Series(cluster_annotations)
+
+
 def signature_creation(sc_data, annotations: pd.Series):
     print("signature creation")
     p_cutoff = 0.01
@@ -202,3 +237,22 @@ def signature_creation(sc_data, annotations: pd.Series):
     smallest_de_analysis = min([len(de_analysis_adjusted[annotation]) for annotation in de_analysis_adjusted])
     optimal_condition_number = condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
     return create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations)
+
+
+def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True):
+    assert sc_counts is not None and annotations is not None
+
+    print("creating signature")
+    signature = signature_creation(sc_counts, annotations)
+    if not with_recursive_step:
+        return signature
+
+    print("creating clustered signature")
+    linkage_matrix = create_linkage_matrix(signature)
+    clusters = create_fclusters(linkage_matrix, len(signature.columns) - 1)
+    assignments = get_fcluster_assignments(clusters, signature.columns)
+    clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
+    clustered_signature = signature_creation(sc_counts, clustered_annotations)
+    result = [(signature, None), (clustered_signature, assignments)]
+
+    return result

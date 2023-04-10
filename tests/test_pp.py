@@ -28,6 +28,12 @@ def small_dwls_signature(data_dir):
 
 
 @pytest.fixture
+def hao_signature(data_dir):
+    hao_signature = pd.read_csv(data_dir / "dwls_signature_hao1.csv", index_col=0)
+    return hao_signature
+
+
+@pytest.fixture
 def small_data_adata(small_data):
     sc_data, annotations = small_data
     annotations = pd.DataFrame(annotations, index=sc_data.columns)
@@ -116,3 +122,65 @@ def test_signature_creation(small_data, small_dwls_signature):
     actual = rectangle.pp.signature_creation(sc_data, annotations).sort_index()
     expected = small_dwls_signature.sort_index()
     assert np.isclose(expected, actual, rtol=1e-05, atol=1e-05).all()
+
+
+def test_create_linkage_matrix(hao_signature):
+    linkage_matrix = rectangle.pp.create_linkage_matrix(hao_signature)
+    assert len(linkage_matrix) == 10
+
+
+def test_create_fclusters(hao_signature):
+    linkage_matrix = rectangle.pp.create_linkage_matrix(hao_signature)
+    clusters = rectangle.pp.create_fclusters(linkage_matrix, 10)
+    # should trigger fallback to distance parameter
+    clusters_max_1 = rectangle.pp.create_fclusters(linkage_matrix, 1)
+
+    # cluster t-cells and  tregs
+    assert list(clusters) == [3, 5, 5, 7, 1, 8, 5, 2, 4, 9, 6]
+    # cluster only closest cell-types (t-cells)
+    assert list(clusters_max_1) == [3, 5, 6, 8, 1, 9, 5, 2, 4, 10, 7]
+
+
+def test_get_fcluster_assignments(hao_signature):
+    linkage_matrix = rectangle.pp.create_linkage_matrix(hao_signature)
+    clusters = rectangle.pp.create_fclusters(linkage_matrix, 10)
+    assignments = rectangle.pp.get_fcluster_assignments(clusters, hao_signature.columns)
+    assert assignments == ["Monocytes", 5, 5, "NK cells", "B cells", "pDC", 5, "Plasma cells", "mDC", "Platelet", "ILC"]
+
+
+def test_create_annotations_from_cluster_labels(hao_signature):
+    annotations = pd.Series(
+        [
+            "NK cells",
+            "pDC",
+            "Plasma cells",
+            "ILC",
+            "T cells CD8",
+            "Platelet",
+            "B cells",
+            "mDC",
+            "T cells CD4 conv",
+            "Tregs",
+            "Monocytes",
+        ]
+    )
+    linkage_matrix = rectangle.pp.create_linkage_matrix(hao_signature)
+    clusters = rectangle.pp.create_fclusters(linkage_matrix, 10)
+    assignments = rectangle.pp.get_fcluster_assignments(clusters, hao_signature.columns)
+    annotations_from_cluster = rectangle.pp.create_annotations_from_cluster_labels(
+        assignments, annotations, hao_signature
+    )
+
+    assert list(annotations_from_cluster) == [
+        "NK cells",
+        "pDC",
+        "Plasma cells",
+        "ILC",
+        "5",
+        "Platelet",
+        "B cells",
+        "mDC",
+        "5",
+        "5",
+        "Monocytes",
+    ]
