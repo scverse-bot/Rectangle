@@ -4,7 +4,7 @@ build:
     os: ubuntu-20.04
     jobs:
         pre_create_environment:
-            - sudo apt-get -y install r-base
+            - apt-get -y install r-base
     tools:
         python: "3.10"
 sphinx:
