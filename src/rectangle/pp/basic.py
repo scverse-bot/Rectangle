@@ -215,7 +215,7 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     label_dict = dict(zip(signature.columns, labels))
     assert set(annotations) == set(signature.columns)
     cluster_annotations = [str(label_dict[x]) for x in annotations]
-    return pd.Series(cluster_annotations)
+    return pd.Series(cluster_annotations, index=annotations.index)
 
 
 def signature_creation(sc_data, annotations: pd.Series):
@@ -239,11 +239,21 @@ def signature_creation(sc_data, annotations: pd.Series):
     return create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations)
 
 
+def calculate_bias_factors(sc_data, annotations, signature):
+    sc_bias_factor = sc_data.gt(0).sum(axis=0)
+    bias_factors = [np.mean(sc_bias_factor[[annotation == x for x in annotations]]) for annotation in signature.columns]
+    bias_factors /= np.min(bias_factors)
+    return bias_factors
+
+
 def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True):
     assert sc_counts is not None and annotations is not None
 
     print("creating signature")
     signature = signature_creation(sc_counts, annotations)
+    bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
+    signature = signature * bias_factors
+
     if not with_recursive_step:
         return signature
 
@@ -253,6 +263,8 @@ def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True)
     assignments = get_fcluster_assignments(clusters, signature.columns)
     clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
     clustered_signature = signature_creation(sc_counts, clustered_annotations)
+    clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
+    clustered_signature = clustered_signature * clustered_bias_factors
     result = [(signature, None), (clustered_signature, assignments)]
 
     return result
