@@ -4,7 +4,8 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
-import src.rectangle as rectangle
+
+import rectangle
 
 
 @pytest.fixture
