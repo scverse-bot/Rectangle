@@ -15,7 +15,7 @@ authors = [
 maintainers = [
     {name = "Bernhard Eder", email = "Bernhard.Eder@student.uibk.ac.at"},
 ]
-urls.Documentation = "https://Rectangle.readthedocs.io/"
+urls.Documentation = "https://rectanglepy.readthedocs.io/"
 urls.Source = "https://github.com/bernheder/Rectangle"
 urls.Home-page = "https://github.com/bernheder/Rectangle"
 dependencies = [
