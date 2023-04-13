@@ -1,6 +1,7 @@
 import anndata as ad
 import numpy as np
 import pandas as pd
+import rpy2.robjects.packages as rpackages
 import statsmodels.stats.multitest as multi
 from anndata import AnnData
 from rpy2 import robjects
@@ -65,22 +66,10 @@ def mean_in_log2space(values, pseudo_count):
 
 
 def check_mast_install():
-    import rpy2.robjects.packages as rpackages
-
     if not rpackages.isinstalled("BiocManager"):
-        utils = rpackages.importr("utils")
-        utils.chooseCRANmirror(ind=1)
-        print("BiocManager not installed, installing now")
-        utils.install_packages("BiocManager")
-        biocmanager = rpackages.importr("BiocManager")
-        biocmanager.install(version="3.16")
+        print("BiocManager not installed")
     if not rpackages.isinstalled("MAST"):
-        utils = rpackages.importr("utils")
-        utils.chooseCRANmirror(ind=1)
-        print("MAST not installed, installing now")
-        print("This may take a few minutes...")
-        biocmanager = rpackages.importr("BiocManager")
-        biocmanager.install("MAST")
+        print("MAST is not installed")
 
 
 def create_data_for_mast(counts, groups):

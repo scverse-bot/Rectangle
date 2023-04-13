@@ -23,10 +23,10 @@ Python installed, we recommend installing [Mambaforge](https://github.com/conda-
 There are several alternative options to install Rectangle:
 
 <!--
-1) Install the latest release of `Rectangle` from `PyPI <https://pypi.org/project/Rectangle/>`_:
+1) Install the latest release of `Rectangle` from `PyPI <https://pypi.org/project/rectanglepy/>`_:
 
 ```bash
-pip install Rectangle
+pip install rectanglepy
 ```
 -->
 
@@ -51,6 +51,6 @@ If you found a bug, please use the [issue tracker][issue-tracker].
 
 [scverse-discourse]: https://discourse.scverse.org/
 [issue-tracker]: https://github.com/bernheder/Rectangle/issues
-[changelog]: https://Rectangle.readthedocs.io/latest/changelog.html
-[link-docs]: https://Rectangle.readthedocs.io
-[link-api]: https://Rectangle.readthedocs.io/latest/api.html
+[changelog]: https://Rectanglepy.readthedocs.io/latest/changelog.html
+[link-docs]: https://Rectanglepy.readthedocs.io
+[link-api]: https://Rectanglepy.readthedocs.io/latest/api.html

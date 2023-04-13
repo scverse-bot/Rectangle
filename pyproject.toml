@@ -3,8 +3,8 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [project]
-name = "rectangle"
-version = "0.0.1"
+name = "rectanglepy"
+version = "0.0.2"
 description = "A very interesting piece of code"
 readme = "README.md"
 requires-python = ">=3.10"

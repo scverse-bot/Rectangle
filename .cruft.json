@@ -5,7 +5,7 @@
     "context": {
         "cookiecutter": {
             "project_name": "Rectangle",
-            "package_name": "rectangle",
+            "package_name": "rectanglepy",
             "project_description": "A very interesting piece of code",
             "author_full_name": "Bernhard Eder",
             "author_email": "yourname@example.com",
