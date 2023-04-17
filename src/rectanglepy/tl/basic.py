@@ -105,4 +105,92 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
         change = np.linalg.norm(solution_averages - approximate_solution, 1)
         approximate_solution = solution_averages
         iterations += 1
-    return approximate_solution
+
+    return pd.Series(approximate_solution, index=signature.columns)
+
+
+def recursive_deconvolute(signatures, bulk, sc_data=None, annotations=None):
+    assert (signatures is not None) and (bulk is not None)
+    start_signature = signatures[0][0]
+
+    print("deconvolute start fractions")
+    start_fractions = weighted_dampened_deconvolute(start_signature, bulk)
+
+    if len(signatures) == 1:
+        print("Simple deconvolution without recursive step")
+        return start_fractions
+
+    print("deconvolute recursive step")
+    clustered_signature = signatures[1][0]
+    clustered_assignments = signatures[1][1]
+
+    print("Recursive deconvolution")
+    clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
+    recursive_fractions = weighted_dampened_deconvolute(
+        start_signature, bulk, clustered_assignments, clustered_fractions
+    )
+
+    final_fractions = pd.concat([start_fractions, recursive_fractions]).groupby(level=0).mean()
+
+    if sc_data is not None and annotations is not None:
+        print("correct for unknown content")
+        pseudo_signature = create_cpm_pseudo_signature(sc_data, annotations)
+        final_fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, final_fractions)
+
+    return final_fractions
+
+
+def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, sc_data, annotations) -> pd.Series:
+    assert (signature is not None) and (bulk is not None)
+
+    print("direct deconvolute")
+    fractions = weighted_dampened_deconvolute(signature, bulk)
+
+    if sc_data is not None and annotations is not None:
+        print("correct for unknown content")
+        pseudo_signature = create_cpm_pseudo_signature(sc_data, annotations)
+        fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions)
+
+    return fractions
+
+
+# Function to get a pseudobulk signature for each cell type
+# starting from scRNA-seq data in count format.
+# Unlike the signatures built by deconvolution methods,
+# this one contains all genes in the input data.
+# The final signature in output is in CPM format.
+def create_cpm_pseudo_signature(sc_counts, annotations):
+    sc_counts.columns = pd.MultiIndex.from_arrays([annotations, sc_counts.columns])
+    df_mean = sc_counts.T.groupby(level=0).mean().T
+    df_mean_cpm = df_mean.apply(lambda x: x / sum(x) * 1e6)
+    return df_mean_cpm
+
+
+def create_scaling_factors(pseudo_signature: pd.DataFrame) -> pd.Series:
+    scaling = (pseudo_signature > 0).sum()
+    return scaling / min(scaling)
+
+
+def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates):
+    scaling_factors = create_scaling_factors(pseudo_signature)
+    genes = list(set(pseudo_signature.index) & set(bulk.index))
+    signature = pseudo_signature.loc[genes].sort_index()
+    bulk = bulk.loc[genes].sort_index()
+
+    # Reconstruct the bulk expression profiles through matrix multiplication
+    # of the estimated cell fractions (weighted by the scaling factors) and
+    # cell-type-specific expression profiles (i.e. signature)
+    bulk_est = pd.Series(np.dot(signature, (estimates.T * scaling_factors).T))
+    bulk_est.index = signature.index
+
+    # Calculate the unknown cellular content ad the difference of
+    # per-sample overall expression levels in the true vs. reconstructed
+    # bulk RNA-seq data, divided by the overall expression in the true bulk
+    ukn_cc = (bulk - bulk_est).sum() / (bulk.sum())
+
+    # Correct (i.e. scale) the cell fraction estimates so that their sum
+    # equals 1 - the unknown cellular content estimated above
+    estimates_fix = estimates / estimates.sum() * (1 - ukn_cc)
+    estimates_fix.loc["Unknown"] = abs(ukn_cc)
+
+    return estimates_fix

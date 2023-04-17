@@ -76,12 +76,11 @@ def create_data_for_mast(counts, groups):
     check_mast_install()
     mast = importr("MAST")
     with localconverter(robjects.default_converter + pandas2ri.converter):
-        f_data_r = robjects.conversion.py2rpy(pd.DataFrame(data={"primerid": counts.index}))
-        c_data_r = robjects.conversion.py2rpy(
+        f_data_r = robjects.conversion.get_conversion().py2rpy(pd.DataFrame(data={"primerid": counts.index}))
+        c_data_r = robjects.conversion.get_conversion().py2rpy(
             pd.DataFrame(data={"wellKey": counts.T.index, "Population": groups, "ncells": 1})
         )
-        counts_data_r = robjects.conversion.py2rpy(counts)
-    robjects.r.assign("counts.data", counts_data_r)
+        robjects.r.assign("counts.data", robjects.conversion.get_conversion().py2rpy(counts))
     return mast.FromMatrix(robjects.r("data.matrix(counts.data)"), c_data_r, f_data_r)
 
 
@@ -90,7 +89,9 @@ def mast_lr_test(zlm_output):
     robjects.r.assign("zlm.lr", mast.lrTest(zlm_output, "Population"))
     robjects.r.assign("zlm.lr", robjects.r('reshape2::melt(zlm.lr[, , "Pr(>Chisq)"])'))
     with localconverter(robjects.default_converter + pandas2ri.converter):
-        zlm_lr_df = robjects.conversion.rpy2py(robjects.r('zlm.lr[which(zlm.lr$test.type == "hurdle"), ]'))
+        zlm_lr_df = robjects.conversion.get_conversion().rpy2py(
+            robjects.r('zlm.lr[which(zlm.lr$test.type == "hurdle"), ]')
+        )
     return zlm_lr_df
 
 
@@ -235,13 +236,15 @@ def calculate_bias_factors(sc_data, annotations, signature):
     return bias_factors
 
 
-def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True):
+def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True, calculate_bias=True):
     assert sc_counts is not None and annotations is not None
 
     print("creating signature")
     signature = signature_creation(sc_counts, annotations)
-    bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
-    signature = signature * bias_factors
+
+    if calculate_bias:
+        bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
+        signature = signature * bias_factors
 
     if not with_recursive_step:
         return signature
@@ -251,9 +254,10 @@ def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True)
     clusters = create_fclusters(linkage_matrix, len(signature.columns) - 1)
     assignments = get_fcluster_assignments(clusters, signature.columns)
     clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
-    clustered_signature = signature_creation(sc_counts, clustered_annotations)
-    clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
-    clustered_signature = clustered_signature * clustered_bias_factors
-    result = [(signature, None), (clustered_signature, assignments)]
 
-    return result
+    clustered_signature = signature_creation(sc_counts, clustered_annotations)
+    if calculate_bias:
+        clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
+        clustered_signature = clustered_signature * clustered_bias_factors
+
+    return [(signature, None), (clustered_signature, assignments)]

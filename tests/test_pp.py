@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import rectangle
+import rectanglepy as rectangle
 
 
 @pytest.fixture
