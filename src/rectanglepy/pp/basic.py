@@ -214,6 +214,7 @@ def signature_creation(sc_data, annotations: pd.Series):
 
     de_analysis_results = de_analysis(sc_data, annotations)
     de_analysis_adjusted = {}
+    sc_data = convert_to_cpm(sc_data)
 
     for annotation in annotations.unique():
         de_analysis_result = de_analysis_results[annotation]
