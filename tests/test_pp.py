@@ -119,7 +119,7 @@ def test_de_analysis(small_data):
 
 def test_signature_creation(small_data, small_dwls_signature):
     sc_data, annotations = small_data
-    actual = rectangle.pp.signature_creation(sc_data, annotations).sort_index()
+    actual = rectangle.pp.signature_creation(sc_data, annotations, False).sort_index()
     expected = small_dwls_signature.sort_index()
     assert np.isclose(expected, actual, rtol=1e-05, atol=1e-05).all()
 
@@ -197,7 +197,7 @@ def test_build_rectangle_signatures_non_recursive(small_data, small_dwls_signatu
     sc_data, annotations = small_data
     bias_factors = rectangle.pp.calculate_bias_factors(sc_data, annotations, small_dwls_signature)
     expected = (small_dwls_signature * bias_factors).sort_index()
-    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False).sort_index()
+    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False).sort_index()
     assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
 
 
@@ -205,6 +205,12 @@ def test_build_rectangle_signatures_recursive(small_data, small_dwls_signature):
     sc_data, annotations = small_data
     bias_factors = rectangle.pp.calculate_bias_factors(sc_data, annotations, small_dwls_signature)
     expected = (small_dwls_signature * bias_factors).sort_index()
-    signatures = rectangle.pp.build_rectangle_signatures(sc_data, annotations)
+    signatures = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False)
     actual = signatures[0][0].sort_index()
     assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+
+
+def test_convert_to_cpm(small_data):
+    count_sc_data = small_data[0]
+    cpm_sc_data = rectangle.pp.convert_to_cpm(count_sc_data)
+    assert cpm_sc_data.iloc[1, 0] == 179.69971924559664

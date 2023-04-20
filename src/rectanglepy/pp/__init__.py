@@ -1,6 +1,7 @@
 from .basic import (
     build_rectangle_signatures,
     calculate_bias_factors,
+    convert_to_cpm,
     create_annotations_from_cluster_labels,
     create_data_for_mast,
     create_fclusters,

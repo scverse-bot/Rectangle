@@ -208,13 +208,17 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     return pd.Series(cluster_annotations, index=annotations.index)
 
 
-def signature_creation(sc_data, annotations: pd.Series):
+def signature_creation(sc_data, annotations: pd.Series, do_cpm_conversion=True):
     print("signature creation")
     p_cutoff = 0.01
+    # remove unexpressed genes
+    sc_data = sc_data.loc[~(sc_data == 0).all(axis=1)]
+
+    if do_cpm_conversion:
+        sc_data = convert_to_cpm(sc_data)
 
     de_analysis_results = de_analysis(sc_data, annotations)
     de_analysis_adjusted = {}
-    sc_data = convert_to_cpm(sc_data)
 
     for annotation in annotations.unique():
         de_analysis_result = de_analysis_results[annotation]
@@ -237,11 +241,13 @@ def calculate_bias_factors(sc_data, annotations, signature):
     return bias_factors
 
 
-def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True, calculate_bias=True):
+def build_rectangle_signatures(
+    sc_counts, annotations, convert_to_cpm=True, with_recursive_step=True, calculate_bias=True
+):
     assert sc_counts is not None and annotations is not None
 
     print("creating signature")
-    signature = signature_creation(sc_counts, annotations)
+    signature = signature_creation(sc_counts, annotations, convert_to_cpm)
 
     if calculate_bias:
         bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
@@ -256,7 +262,7 @@ def build_rectangle_signatures(sc_counts, annotations, with_recursive_step=True,
     assignments = get_fcluster_assignments(clusters, signature.columns)
     clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
 
-    clustered_signature = signature_creation(sc_counts, clustered_annotations)
+    clustered_signature = signature_creation(sc_counts, clustered_annotations, convert_to_cpm)
     if calculate_bias:
         clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
         clustered_signature = clustered_signature * clustered_bias_factors
