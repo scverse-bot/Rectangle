@@ -3,8 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-
-import rectanglepy as rectangle
+import src.rectanglepy as rectangle
 
 
 @pytest.fixture

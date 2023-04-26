@@ -4,6 +4,7 @@ import pandas as pd
 import rpy2.robjects.packages as rpackages
 import statsmodels.stats.multitest as multi
 from anndata import AnnData
+from pandas import DataFrame
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
@@ -29,7 +30,7 @@ def make_pseudo_bulk_adata(adata: AnnData, group_size: int) -> AnnData:
     assert False is adata.obs.empty
 
     annotations = adata.obs.iloc[:, 0]
-    sc_data = pd.DataFrame(data=adata.X.T, columns=adata.obs.index, index=list(adata.var.iloc[:, 0]))
+    sc_data = adata.to_df().T
 
     bulk_df, bulk_annotations = make_pseudo_bulk(sc_data, annotations, group_size)
     return ad.AnnData(X=bulk_df.values.T, obs=pd.DataFrame(bulk_annotations, index=bulk_df.columns), var=adata.var)
@@ -75,6 +76,9 @@ def check_mast_install():
 def create_data_for_mast(counts, groups):
     check_mast_install()
     mast = importr("MAST")
+    # can't get to make the conversion work with sparse matrices, so we convert to dense
+    if pd.api.types.is_sparse(counts.iloc[:, 0]):
+        counts = counts.sparse.to_dense()
     with localconverter(robjects.default_converter + pandas2ri.converter):
         f_data_r = robjects.conversion.get_conversion().py2rpy(pd.DataFrame(data={"primerid": counts.index}))
         c_data_r = robjects.conversion.get_conversion().py2rpy(
@@ -139,7 +143,9 @@ def stat_log2(values_df, group, pseudo_count):
     return log_mean_r.drop("group")
 
 
-def create_condition_number_matrix(de_adjusted, sc_data, max_gene_number, annotations):
+def create_condition_number_matrix(
+    de_adjusted, sc_data: pd.DataFrame, max_gene_number: int, annotations
+) -> pd.DataFrame:
     genes = [find_signature_genes(max_gene_number, de_adjusted[annotation]) for annotation in de_adjusted]
     genes = list({gene for sublist in genes for gene in sublist})
 
@@ -180,16 +186,16 @@ def create_linkage_matrix(signature: pd.DataFrame):
     return linkage((np.log(signature + 1)).T, method=method, metric=metric)
 
 
-def create_fclusters(linkage_matrix, maxclust):
+def create_fclusters(linkage_matrix, maxclust) -> list[int]:
     clusters = fcluster(linkage_matrix, criterion="maxclust", t=maxclust)
     if len(set(clusters)) == 1:
         # default clustering clustered all cell types in same cluster, fallback to distance metric
         distance = linkage_matrix[0][2]
         clusters = fcluster(linkage_matrix, criterion="distance", t=distance)
-    return clusters
+    return list(clusters)
 
 
-def get_fcluster_assignments(fclusters, signature_columns):
+def get_fcluster_assignments(fclusters: list[int], signature_columns: pd.Index) -> list[int | str]:
     assignments = []
     clusters = list(fclusters)
     for cluster, cell in zip(fclusters, signature_columns):
@@ -208,7 +214,7 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     return pd.Series(cluster_annotations, index=annotations.index)
 
 
-def signature_creation(sc_data, annotations: pd.Series, do_cpm_conversion=True):
+def signature_creation(sc_data: pd.DataFrame, annotations: pd.Series, do_cpm_conversion=True) -> pd.DataFrame:
     print("signature creation")
     p_cutoff = 0.01
     # remove unexpressed genes
@@ -241,9 +247,17 @@ def calculate_bias_factors(sc_data, annotations, signature):
     return bias_factors
 
 
+def build_rectangle_signatures_adata(
+    adata: AnnData, convert_to_cpm=True, with_recursive_step=True, calculate_bias=True
+) -> pd.DataFrame:
+    return build_rectangle_signatures(
+        adata.to_df().T, adata.obs.iloc[:, 0], convert_to_cpm, with_recursive_step, calculate_bias
+    )
+
+
 def build_rectangle_signatures(
-    sc_counts, annotations, convert_to_cpm=True, with_recursive_step=True, calculate_bias=True
-):
+    sc_counts: pd.DataFrame, annotations: pd.Series, convert_to_cpm=True, with_recursive_step=True, calculate_bias=True
+) -> DataFrame | tuple[DataFrame, DataFrame, list[int | str]]:
     assert sc_counts is not None and annotations is not None
 
     print("creating signature")
@@ -267,4 +281,4 @@ def build_rectangle_signatures(
         clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
         clustered_signature = clustered_signature * clustered_bias_factors
 
-    return [(signature, None), (clustered_signature, assignments)]
+    return (signature, clustered_signature, assignments)

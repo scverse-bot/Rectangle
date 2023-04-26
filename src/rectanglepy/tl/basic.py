@@ -160,8 +160,8 @@ def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, sc_data, annota
 # this one contains all genes in the input data.
 # The final signature in output is in CPM format.
 def create_cpm_pseudo_signature(sc_counts, annotations):
-    sc_counts.columns = pd.MultiIndex.from_arrays([annotations, sc_counts.columns])
-    df_mean = sc_counts.T.groupby(level=0).mean().T
+    sc_counts.columns = pd.MultiIndex.from_arrays([annotations.index, annotations.values])
+    df_mean = sc_counts.T.groupby(level=1).mean().T
     df_mean_cpm = df_mean.apply(lambda x: x / sum(x) * 1e6)
     return df_mean_cpm
 

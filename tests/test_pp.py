@@ -4,8 +4,8 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
-
-import rectanglepy as rectangle
+import src.rectanglepy as rectangle
+from scipy import sparse
 
 
 @pytest.fixture
@@ -36,8 +36,17 @@ def hao_signature(data_dir):
 @pytest.fixture
 def small_data_adata(small_data):
     sc_data, annotations = small_data
-    annotations = pd.DataFrame(annotations, index=sc_data.columns)
+    annotations = pd.DataFrame(data={"annotations": annotations}, index=sc_data.columns)
     return ad.AnnData(X=sc_data.values.T, obs=annotations, var=pd.DataFrame(data=sc_data.index, index=sc_data.index))
+
+
+@pytest.fixture
+def sparse_small_data_adata(small_data):
+    sc_data, annotations = small_data
+    annotations = pd.DataFrame(data={"annotations": annotations}, index=sc_data.columns)
+    adata = ad.AnnData(X=sc_data.values.T, obs=annotations, var=pd.DataFrame(data=sc_data.index, index=sc_data.index))
+    adata.X = sparse.csr_matrix(adata.X)
+    return adata
 
 
 @pytest.fixture
@@ -61,6 +70,11 @@ def log_data(data_dir):
 
 
 # TODO: Add tests with sparse data
+@pytest.fixture
+def sparse_small_data(small_data):
+    sc_data, annotations = small_data
+    sc_data = sc_data.astype(pd.SparseDtype(float, fill_value=0))
+    return sc_data, annotations
 
 
 def test_psuedo_bulk_creation(small_data):
@@ -136,9 +150,9 @@ def test_create_fclusters(hao_signature):
     clusters_max_1 = rectangle.pp.create_fclusters(linkage_matrix, 1)
 
     # cluster t-cells and  tregs
-    assert list(clusters) == [3, 5, 5, 7, 1, 8, 5, 2, 4, 9, 6]
+    assert clusters == [3, 5, 5, 7, 1, 8, 5, 2, 4, 9, 6]
     # cluster only closest cell-types (t-cells)
-    assert list(clusters_max_1) == [3, 5, 6, 8, 1, 9, 5, 2, 4, 10, 7]
+    assert clusters_max_1 == [3, 5, 6, 8, 1, 9, 5, 2, 4, 10, 7]
 
 
 def test_get_fcluster_assignments(hao_signature):
@@ -195,17 +209,34 @@ def test_calculate_bias_factors(small_data):
 
 def test_build_rectangle_signatures_non_recursive(small_data, small_dwls_signature):
     sc_data, annotations = small_data
-    bias_factors = rectangle.pp.calculate_bias_factors(sc_data, annotations, small_dwls_signature)
-    expected = (small_dwls_signature * bias_factors).sort_index()
-    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False).sort_index()
+    expected = small_dwls_signature.sort_index()
+    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False, False).sort_index()
     assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+
+
+def test_build_rectangle_signatures_non_recursive_sparse(sparse_small_data, small_dwls_signature):
+    sc_data, annotations = sparse_small_data
+    expected = small_dwls_signature.sort_index()
+    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False, False).sort_index()
+    assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+
+
+def test_build_rectangle_signatures_non_recursive_from_adata(small_data_adata, small_dwls_signature):
+    expected = small_dwls_signature
+    actual = rectangle.pp.build_rectangle_signatures_adata(small_data_adata, False, False, False).sort_index()
+    assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+
+
+def test_build_rectangle_signatures_non_recursive_from_sparse_adata(sparse_small_data_adata, small_dwls_signature):
+    expected = small_dwls_signature
+    actual = rectangle.pp.build_rectangle_signatures_adata(sparse_small_data_adata, False, False, False).sort_index()
+    assert np.isclose(expected.sort_index(), actual, rtol=1e-06, atol=1e-06).all()
 
 
 def test_build_rectangle_signatures_recursive(small_data, small_dwls_signature):
     sc_data, annotations = small_data
-    bias_factors = rectangle.pp.calculate_bias_factors(sc_data, annotations, small_dwls_signature)
-    expected = (small_dwls_signature * bias_factors).sort_index()
-    signatures = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False)
+    expected = small_dwls_signature.sort_index()
+    signatures = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, True, False)
     actual = signatures[0][0].sort_index()
     assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
 

@@ -1,5 +1,6 @@
 from .basic import (
     build_rectangle_signatures,
+    build_rectangle_signatures_adata,
     calculate_bias_factors,
     convert_to_cpm,
     create_annotations_from_cluster_labels,
