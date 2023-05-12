@@ -5,6 +5,8 @@ import pandas as pd
 import quadprog
 import statsmodels.api as sm
 
+from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
+
 
 def scale_weights(weights):
     min_weight = np.nextafter(min(weights), np.float64(1.0))  # prevent division by zero
@@ -16,8 +18,8 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
     # Minimize     1/2 x^T G x - a^T x
     # Subject to   C.T x >= b
     if multiplier is None:
-        a = np.dot(signature.T, bulk)
-        G = np.dot(signature.T, signature)
+        a = np.dot(signature.T, bulk).astype("double")
+        G = np.dot(signature.T, signature).astype("double")
     else:
         weights = np.square(1 / (signature @ gld))
         weights_dampened = np.clip(scale_weights(weights), None, multiplier)
@@ -109,61 +111,39 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     return pd.Series(approximate_solution, index=signature.columns)
 
 
-def recursive_deconvolute(signatures, bulk, sc_data=None, annotations=None):
-    assert (signatures is not None) and (bulk is not None)
-    start_signature = signatures[0][0]
-
+def recursive_deconvolute(signatures: RectangleSignatureResult, bulk) -> pd.Series:
     print("deconvolute start fractions")
-    start_fractions = weighted_dampened_deconvolute(start_signature, bulk)
+    start_fractions = weighted_dampened_deconvolute(signatures.signature, bulk)
 
-    if len(signatures) == 1:
+    if signatures.clustered_signature is None:
         print("Simple deconvolution without recursive step")
         return start_fractions
 
-    print("deconvolute recursive step")
-    clustered_signature = signatures[1][0]
-    clustered_assignments = signatures[1][1]
-
     print("Recursive deconvolution")
-    clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
+    clustered_fractions = weighted_dampened_deconvolute(signatures.clustered_signature, bulk)
     recursive_fractions = weighted_dampened_deconvolute(
-        start_signature, bulk, clustered_assignments, clustered_fractions
+        signatures.signature, bulk, signatures.assignments, clustered_fractions
     )
 
     final_fractions = pd.concat([start_fractions, recursive_fractions]).groupby(level=0).mean()
 
-    if sc_data is not None and annotations is not None:
-        print("correct for unknown content")
-        pseudo_signature = create_cpm_pseudo_signature(sc_data, annotations)
-        final_fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, final_fractions)
+    if signatures.pseudo_signature is not None:
+        final_fractions = correct_for_unknown_cell_content(bulk, signatures.pseudo_signature, final_fractions)
 
     return final_fractions
 
 
-def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, sc_data, annotations) -> pd.Series:
+def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, pseudo_signature: pd.DataFrame = None) -> pd.Series:
     assert (signature is not None) and (bulk is not None)
 
     print("direct deconvolute")
     fractions = weighted_dampened_deconvolute(signature, bulk)
 
-    if sc_data is not None and annotations is not None:
+    if pseudo_signature is not None:
         print("correct for unknown content")
-        pseudo_signature = create_cpm_pseudo_signature(sc_data, annotations)
         fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions)
 
     return fractions
-
-
-# Function to get a pseudobulk signature for each cell type
-# starting from scRNA-seq data in count format.
-# Unlike the signatures built by deconvolution methods,
-# this one contains all genes in the input data.
-# The final signature in output is in CPM format.
-def create_cpm_pseudo_signature(sc_counts, annotations):
-    sc_counts.columns = pd.MultiIndex.from_arrays([annotations.index, annotations.values])
-    df_mean = sc_counts.T.groupby(level=1).mean().T
-    df_mean_cpm = df_mean.apply(lambda x: x / sum(x) * 1e6)
-    return df_mean_cpm
 
 
 def create_scaling_factors(pseudo_signature: pd.DataFrame) -> pd.Series:

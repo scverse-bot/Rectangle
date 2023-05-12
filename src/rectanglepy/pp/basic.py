@@ -4,12 +4,13 @@ import pandas as pd
 import rpy2.robjects.packages as rpackages
 import statsmodels.stats.multitest as multi
 from anndata import AnnData
-from pandas import DataFrame
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import importr
 from scipy.cluster.hierarchy import fcluster, linkage
+
+from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
 
 
 def make_pseudo_bulk_adata(adata: AnnData, group_size: int) -> AnnData:
@@ -59,7 +60,8 @@ def make_pseudo_bulk(sc_data: pd.DataFrame, annotations: pd.Series, group_size=2
 
 
 def convert_to_cpm(count_sc_data):
-    return count_sc_data * 1e6 / np.sum(count_sc_data)
+    # TODO is float 32 enough precision?
+    return (count_sc_data * 1e6 / np.sum(count_sc_data)).astype(np.float32)
 
 
 def mean_in_log2space(values, pseudo_count):
@@ -121,7 +123,7 @@ def de_analysis(sc_data: pd.DataFrame, annotations: pd.Series):
     test_results = {}
     pseudo_count = 0.1
     data_log2 = np.log2(sc_data + pseudo_count)
-    for annotation in np.unique(annotations):
+    for annotation in list(np.unique(annotations)):
         data_log2 = data_log2.loc[:, annotations != annotation].join(data_log2.loc[:, annotations == annotation])
         group_log2 = np.array([1 if x else 0 for x in sorted(annotations == annotation)])
         log2_results = stat_log2(data_log2, group_log2, pseudo_count)
@@ -244,31 +246,43 @@ def calculate_bias_factors(sc_data, annotations, signature):
     sc_bias_factor = sc_data.gt(0).sum(axis=0)
     bias_factors = [np.mean(sc_bias_factor[[annotation == x for x in annotations]]) for annotation in signature.columns]
     bias_factors /= np.min(bias_factors)
-    return bias_factors
+    return pd.Series(bias_factors, index=signature.columns)
+
+
+# Function to get a pseudobulk signature for each cell type
+# starting from scRNA-seq data in count format.
+# Unlike the signatures built by deconvolution methods,
+# this one contains all genes in the input data.
+# The final signature in output is in CPM format.
+def create_cpm_pseudo_signature(sc_counts, annotations):
+    df_mean = sc_counts.groupby(annotations.values, axis=1).mean()
+    df_mean_cpm = df_mean.apply(lambda x: x / sum(x) * 1e6)
+    return df_mean_cpm
 
 
 def build_rectangle_signatures_adata(
-    adata: AnnData, convert_to_cpm=True, with_recursive_step=True, calculate_bias=True
-) -> pd.DataFrame:
-    return build_rectangle_signatures(
-        adata.to_df().T, adata.obs.iloc[:, 0], convert_to_cpm, with_recursive_step, calculate_bias
-    )
+    adata: AnnData, convert_to_cpm=True, with_recursive_step=True
+) -> RectangleSignatureResult:
+    return build_rectangle_signatures(adata.to_df().T, adata.obs.iloc[:, 0], convert_to_cpm, with_recursive_step)
 
 
 def build_rectangle_signatures(
-    sc_counts: pd.DataFrame, annotations: pd.Series, convert_to_cpm=True, with_recursive_step=True, calculate_bias=True
-) -> DataFrame | tuple[DataFrame, DataFrame, list[int | str]]:
+    sc_counts: pd.DataFrame, annotations: pd.Series, convert_to_cpm=True, with_recursive_step=True
+) -> RectangleSignatureResult:
     assert sc_counts is not None and annotations is not None
+
+    pseudo_signature = create_cpm_pseudo_signature(sc_counts, annotations)
 
     print("creating signature")
     signature = signature_creation(sc_counts, annotations, convert_to_cpm)
 
-    if calculate_bias:
-        bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
-        signature = signature * bias_factors
+    bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
+    signature * bias_factors
 
     if not with_recursive_step:
-        return signature
+        return RectangleSignatureResult(
+            signature=signature, pseudo_signature=pseudo_signature, bias_factors=bias_factors
+        )
 
     print("creating clustered signature")
     linkage_matrix = create_linkage_matrix(signature)
@@ -277,8 +291,15 @@ def build_rectangle_signatures(
     clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
 
     clustered_signature = signature_creation(sc_counts, clustered_annotations, convert_to_cpm)
-    if calculate_bias:
-        clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
-        clustered_signature = clustered_signature * clustered_bias_factors
 
-    return (signature, clustered_signature, assignments)
+    clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
+    clustered_signature = clustered_signature * clustered_bias_factors
+
+    return RectangleSignatureResult(
+        signature=signature,
+        pseudo_signature=pseudo_signature,
+        bias_factors=bias_factors,
+        clustered_signature=clustered_signature,
+        clustered_bias_factors=clustered_bias_factors,
+        assignments=assignments,
+    )

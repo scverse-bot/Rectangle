@@ -4,8 +4,9 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
-import src.rectanglepy as rectangle
 from scipy import sparse
+
+import rectanglepy as rectangle
 
 
 @pytest.fixture
@@ -210,38 +211,38 @@ def test_calculate_bias_factors(small_data):
 def test_build_rectangle_signatures_non_recursive(small_data, small_dwls_signature):
     sc_data, annotations = small_data
     expected = small_dwls_signature.sort_index()
-    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False, False).sort_index()
-    assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False)
+    assert np.isclose(expected.sort_index(), actual.signature.sort_index(), rtol=1e-05, atol=1e-05).all()
 
 
 def test_build_rectangle_signatures_non_recursive_sparse(sparse_small_data, small_dwls_signature):
     sc_data, annotations = sparse_small_data
     expected = small_dwls_signature.sort_index()
-    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False, False).sort_index()
-    assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, False)
+    assert np.isclose(expected.sort_index(), actual.signature.sort_index(), rtol=1e-05, atol=1e-05).all()
 
 
 def test_build_rectangle_signatures_non_recursive_from_adata(small_data_adata, small_dwls_signature):
     expected = small_dwls_signature
-    actual = rectangle.pp.build_rectangle_signatures_adata(small_data_adata, False, False, False).sort_index()
-    assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
+    actual = rectangle.pp.build_rectangle_signatures_adata(small_data_adata, False, False)
+    assert np.isclose(expected.sort_index(), actual.signature.sort_index(), rtol=1e-05, atol=1e-05).all()
 
 
 def test_build_rectangle_signatures_non_recursive_from_sparse_adata(sparse_small_data_adata, small_dwls_signature):
     expected = small_dwls_signature
-    actual = rectangle.pp.build_rectangle_signatures_adata(sparse_small_data_adata, False, False, False).sort_index()
-    assert np.isclose(expected.sort_index(), actual, rtol=1e-06, atol=1e-06).all()
+    actual = rectangle.pp.build_rectangle_signatures_adata(sparse_small_data_adata, False, False)
+    assert np.isclose(expected.sort_index(), actual.signature.sort_index(), rtol=1e-06, atol=1e-06).all()
 
 
 def test_build_rectangle_signatures_recursive(small_data, small_dwls_signature):
     sc_data, annotations = small_data
     expected = small_dwls_signature.sort_index()
-    signatures = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, True, False)
-    actual = signatures[0][0].sort_index()
+    signatures = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False, True)
+    actual = signatures.signature.sort_index()
     assert np.isclose(expected.sort_index(), actual, rtol=1e-05, atol=1e-05).all()
 
 
 def test_convert_to_cpm(small_data):
     count_sc_data = small_data[0]
     cpm_sc_data = rectangle.pp.convert_to_cpm(count_sc_data)
-    assert cpm_sc_data.iloc[1, 0] == 179.69971924559664
+    assert np.isclose(cpm_sc_data.iloc[1, 0], 179.69972)

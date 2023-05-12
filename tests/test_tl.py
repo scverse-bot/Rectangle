@@ -3,7 +3,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-import src.rectanglepy as rectangle
+
+import rectanglepy as rectangle
 
 
 @pytest.fixture
@@ -73,29 +74,23 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
     assert corr > 0.92 and rsme < 0.015
 
 
-def test_create_simple_pseudo_cpm_bulk_signature(small_data):
-    sc_counts, annotations, bulk = small_data
-    result = rectangle.tl.create_cpm_pseudo_signature(sc_counts, annotations)
-    assert (len(result) == len(sc_counts)) & (result.iloc[1, 0] == 49.832037342450654)
-
-
 def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     sc_counts, annotations, bulk = small_data
-    signature = rectangle.pp.signature_creation(sc_counts, annotations)
+    signature = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, True, False)
     bulk, _, _ = quantiseq_data
     bulk = bulk.iloc[:, 11]
-    fractions = rectangle.tl.weighted_dampened_deconvolute(signature, bulk)
+    fractions = rectangle.tl.weighted_dampened_deconvolute(signature.signature, bulk)
 
-    pseudo_signature = rectangle.tl.create_cpm_pseudo_signature(sc_counts, annotations)
+    pseudo_signature = signature.pseudo_signature
     result = rectangle.tl.correct_for_unknown_cell_content(bulk, pseudo_signature, fractions)
     assert len(fractions) + 1 == len(result)
 
 
 def test_direct_deconvolute(small_data):
     sc_counts, annotations, bulk = small_data
-    signatures = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, True)
+    signatures = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, True, False)
     bulk = bulk.iloc[:, 1]
-    rectangle.tl.recursive_deconvolute(signatures, bulk)
+    rectangle.tl.direct_deconvolute(signatures.signature, bulk)
 
 
 def test_recursive_deconvolute(small_data):
