@@ -1,32 +1,37 @@
-from dataclasses import dataclass
-
 import pandas as pd
 
 
-@dataclass
 class RectangleSignatureResult:
-    """Represents the result of a rectangle signature analysis.
+    """12Represents the result of a rectangle signature analysis.
 
-    Attributes:
+    Parameters
     ----------
-        signature (pd.DataFrame): The signature data as a DataFrame.
-        bias_factors (pd.Series): The bias factors associated with the signature data.
-        pseudo_signature (pd.DataFrame): The pseudo signature data as a DataFrame.
-        clustered_signature (pd.DataFrame, optional): The clustered signature data as a DataFrame.
-        clustered_bias_factors (pd.Series, optional): The bias factors associated with the clustered signature data.
-        assignments (list[int | str], optional): The assignments of signature cell-types to clusters.
-
-    Note:
-    ----
-        - The `signature` attribute is mandatory, while the other attributes are optional.
-        - The `bias_factors` is already multiplied into the signature.
-        - The `pseudo_signature` is used for correction of unknown content in the deconvolution step.
-        - The `clustered_signature` is only created when signature result is created with recursive step.
+    signature
+        The signature data as a DataFrame.
+    bias_factors
+        The bias factors associated with the signature data. Is already multiplied into the signature.
+    pseudo_signature
+        The pseudo signature data as a DataFrame. Is used for correction of unknown content in the deconvolution step.
+    clustered_signature
+        The clustered signature data as a DataFrame. Is only created when signature result is created with recursive step.
+    clustered_bias_factors
+        The bias factors associated with the clustered signature data.
+    assignments
+        The assignments of signature cell-types to clusters.
     """
 
-    signature: pd.DataFrame
-    bias_factors: pd.Series
-    pseudo_signature: pd.DataFrame
-    clustered_signature: pd.DataFrame | None = None
-    clustered_bias_factors: pd.Series | None = None
-    assignments: list[int | str] | None = None
+    def __init__(
+        self,
+        signature: pd.DataFrame,
+        bias_factors: pd.Series,
+        pseudo_signature: pd.DataFrame,
+        clustered_signature: pd.DataFrame = None,
+        clustered_bias_factors: pd.Series = None,
+        assignments: list[int or str] = None,
+    ):
+        self.signature = signature
+        self.bias_factors = bias_factors
+        self.pseudo_signature = pseudo_signature
+        self.clustered_signature = clustered_signature
+        self.clustered_bias_factors = clustered_bias_factors
+        self.assignments = assignments

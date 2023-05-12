@@ -16,3 +16,4 @@ from .basic import (
     signature_creation,
     stat_log2,
 )
+from .rectangle_signature import RectangleSignatureResult

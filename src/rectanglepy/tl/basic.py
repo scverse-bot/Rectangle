@@ -111,7 +111,28 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     return pd.Series(approximate_solution, index=signature.columns)
 
 
-def recursive_deconvolute(signatures: RectangleSignatureResult, bulk) -> pd.Series:
+def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Series:
+    """Performs recursive deconvolution using rectangle signatures and bulk data.
+
+    Parameters
+    ----------
+    signatures
+        The rectangle signature result containing the signature data and results.
+    bulk
+        The bulk data for deconvolution.
+
+    Returns
+    -------
+        pd.Series: The estimated cell fractions resulting from deconvolution.
+
+    Notes
+    -----
+        - The `signatures` parameter should be an instance of the `RectangleSignatureResult` class, representing the result of a rectangle signature analysis.
+        - The `bulk` parameter should be a pandas Series representing the bulk data for deconvolution.
+        - The function performs weighted dampened deconvolution using the original signature data, unless a clustered signature is available in the `signatures` object. In that case, recursive deconvolution is performed using both the original signature and clustered signature data.
+        - The resulting estimated cell fractions are returned as a pandas Series.
+        - If a pseudo signature is available in the `signatures` object, the estimated cell fractions are corrected for unknow cell content using the pseudo signature and the bulk data.
+    """
     print("deconvolute start fractions")
     start_fractions = weighted_dampened_deconvolute(signatures.signature, bulk)
 
@@ -134,6 +155,29 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk) -> pd.Seri
 
 
 def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, pseudo_signature: pd.DataFrame = None) -> pd.Series:
+    """Performs direct deconvolution using a signature and bulk data.
+
+    Parameters
+    ----------
+    signature
+        The signature data for deconvolution.
+    bulk
+        The bulk data for deconvolution.
+    pseudo_signature
+        The pseudo signature data used to correct for unknown cell content. Defaults to None.
+
+    Returns
+    -------
+    pd.Series: The estimated cell fractions resulting from deconvolution.
+
+    Notes
+    -----
+        - The `signature` parameter should be a pandas DataFrame representing the signature data for deconvolution.
+        - The `bulk` parameter should be a pandas Series representing the bulk data for deconvolution.
+        - The function performs weighted dampened deconvolution using the provided signature and bulk data.
+        - If a `pseudo_signature` is provided, the estimated cell fractions are corrected for unknown cell content using the pseudo signature and the bulk data.
+        - The resulting estimated cell fractions are returned as a pandas Series.
+    """
     assert (signature is not None) and (bulk is not None)
 
     print("direct deconvolute")

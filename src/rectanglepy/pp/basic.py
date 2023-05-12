@@ -10,7 +10,7 @@ from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import importr
 from scipy.cluster.hierarchy import fcluster, linkage
 
-from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
+from .rectangle_signature import RectangleSignatureResult
 
 
 def make_pseudo_bulk_adata(adata: AnnData, group_size: int) -> AnnData:
@@ -269,6 +269,23 @@ def build_rectangle_signatures_adata(
 def build_rectangle_signatures(
     sc_counts: pd.DataFrame, annotations: pd.Series, convert_to_cpm=True, with_recursive_step=True
 ) -> RectangleSignatureResult:
+    """Builds rectangle signatures based on single-cell count data and annotations.
+
+    Parameters
+    ----------
+    sc_counts
+        The single-cell count data as a DataFrame. DataFrame should have the genes as rows and cell as columns.
+    annotations
+        The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
+    convert_to_cpm
+        Indicates whether the count data should be converted to counts per million (CPM). Defaults to True.
+    with_recursive_step
+        Indicates whether to include the recursive clustering step. Defaults to True.
+
+    Returns
+    -------
+    The result of the rectangle signature analysis.
+    """
     assert sc_counts is not None and annotations is not None
 
     pseudo_signature = create_cpm_pseudo_signature(sc_counts, annotations)

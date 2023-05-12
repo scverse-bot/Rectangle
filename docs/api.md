@@ -3,36 +3,25 @@
 ## Preprocessing
 
 ```{eval-rst}
-.. module:: rectangle.pp
-.. currentmodule:: rectangle
+.. module:: rectanglepy.pp
+.. currentmodule:: rectanglepy
 
 .. autosummary::
     :toctree: generated
 
-    pp.basic_preproc
+    pp.build_rectangle_signatures
+    pp.RectangleSignatureResult
 ```
 
 ## Tools
 
 ```{eval-rst}
-.. module:: rectangle.tl
-.. currentmodule:: rectangle
+.. module:: rectanglepy.tl
+.. currentmodule:: rectanglepy
 
 .. autosummary::
     :toctree: generated
 
-    tl.basic_tool
-```
-
-## Plotting
-
-```{eval-rst}
-.. module:: rectangle.pl
-.. currentmodule:: rectangle
-
-.. autosummary::
-    :toctree: generated
-
-    pl.basic_plot
-    pl.BasicClass
+    tl.direct_deconvolute
+    tl.recursive_deconvolute
 ```
