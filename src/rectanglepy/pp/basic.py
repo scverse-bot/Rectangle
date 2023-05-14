@@ -60,8 +60,7 @@ def make_pseudo_bulk(sc_data: pd.DataFrame, annotations: pd.Series, group_size=2
 
 
 def convert_to_cpm(count_sc_data):
-    # TODO is float 32 enough precision?
-    return (count_sc_data * 1e6 / np.sum(count_sc_data)).astype(np.float32)
+    return count_sc_data * 1e6 / np.sum(count_sc_data)
 
 
 def mean_in_log2space(values, pseudo_count):
@@ -294,7 +293,7 @@ def build_rectangle_signatures(
     signature = signature_creation(sc_counts, annotations, convert_to_cpm)
 
     bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
-    signature * bias_factors
+    signature = signature * bias_factors
 
     if not with_recursive_step:
         return RectangleSignatureResult(
