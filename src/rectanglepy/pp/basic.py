@@ -215,14 +215,11 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     return pd.Series(cluster_annotations, index=annotations.index)
 
 
-def signature_creation(sc_data: pd.DataFrame, annotations: pd.Series, do_cpm_conversion=True) -> pd.DataFrame:
+def signature_creation(sc_data: pd.DataFrame, annotations: pd.Series) -> pd.DataFrame:
     print("signature creation")
     p_cutoff = 0.01
     # remove unexpressed genes
     sc_data = sc_data.loc[~(sc_data == 0).all(axis=1)]
-
-    if do_cpm_conversion:
-        sc_data = convert_to_cpm(sc_data)
 
     de_analysis_results = de_analysis(sc_data, annotations)
     de_analysis_adjusted = {}
@@ -242,10 +239,12 @@ def signature_creation(sc_data: pd.DataFrame, annotations: pd.Series, do_cpm_con
 
 
 def calculate_bias_factors(sc_data, annotations, signature):
-    sc_bias_factor = sc_data.gt(0).sum(axis=0)
-    bias_factors = [np.mean(sc_bias_factor[[annotation == x for x in annotations]]) for annotation in signature.columns]
-    bias_factors /= np.min(bias_factors)
-    return pd.Series(bias_factors, index=signature.columns)
+    sc_bias_factor = sc_data.apply(lambda x: x[x > 0].count(), axis=0)
+    bias_factors = []
+    for annotation in signature.columns:
+        bias_factors.append(np.mean(sc_bias_factor[[True if annotation == x else False for x in annotations]]))
+    bias_factors = bias_factors / min(bias_factors)
+    return bias_factors
 
 
 # Function to get a pseudobulk signature for each cell type
@@ -265,8 +264,101 @@ def build_rectangle_signatures_adata(
     return build_rectangle_signatures(adata.to_df().T, adata.obs.iloc[:, 0], convert_to_cpm, with_recursive_step)
 
 
+def generate_limma(countsig):
+    countsig = countsig[countsig.sum(axis=1) > 0]
+    edgeR = importr("edgeR")
+    importr("base")
+    limma = importr("limma")
+    importr("stats")
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        countsig_r = robjects.conversion.get_conversion().py2rpy(countsig)
+    dge_list = edgeR.DGEList(countsig_r)
+    dge_list = edgeR.calcNormFactors(dge_list)
+    cell_degs = {}
+    for i in range(0, len(countsig.columns)):
+        cell_type = countsig.columns[i]
+        groups = pd.Series(np.zeros(len(countsig.columns)))
+        groups[i] = 1
+        ones = pd.Series(np.ones(len(countsig.columns)))
+        design = pd.DataFrame({"(intercept)": ones, "group" + str(i + 1): groups}).astype("int")
+        with localconverter(robjects.default_converter + pandas2ri.converter):
+            design_r = robjects.conversion.get_conversion().py2rpy(design)
+
+        v = limma.voom(dge_list, design_r, plot=False)
+        fit = limma.lmFit(v, design=design_r)
+        fit = limma.eBayes(fit)
+        degs_r = limma.topTable(fit, coef=2, n=len(countsig))
+        # convert back to pandas
+        with localconverter(robjects.default_converter + pandas2ri.converter):
+            degs = robjects.conversion.get_conversion().rpy2py(degs_r)
+
+        degs = degs[degs["logFC"] > 0]
+
+        cell_degs[cell_type] = degs
+    return cell_degs
+
+
+def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
+    countsig = pseudo_count_sig
+    limma = generate_limma(countsig)
+
+    cpm_sig = convert_to_cpm(countsig)
+    biasfact = (countsig > 0).sum(axis=0)
+    biasfact = biasfact / biasfact.min()
+    cpm_sig = cpm_sig * biasfact
+
+    min_log2FC = 1
+    max_p = 0.02
+
+    de_analysis_adjusted = {}
+    for annotation in limma.keys():
+        de_analysis_result = limma[annotation]
+        de_analysis_result["log2_fc"] = de_analysis_result["logFC"]
+        de_analysis_result["gene"] = list(de_analysis_result.index)
+        de_analysis_adjusted[annotation] = de_analysis_result[
+            (de_analysis_result["P.Value"] < max_p) & (de_analysis_result["logFC"] > min_log2FC)
+        ]
+
+    condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
+    condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
+    smallest_de_analysis = min([len(de_analysis_adjusted[annotation]) for annotation in de_analysis_adjusted])
+    optimal_condition_number = condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
+    markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
+    result = cpm_sig.loc[markers, :]
+    return result
+
+
+def get_limma_genes(pseudo_count_sig):
+    countsig = pseudo_count_sig
+    limma = generate_limma(countsig)
+    cpm_sig = convert_to_cpm(countsig)
+    biasfact = (countsig > 0).sum(axis=0)
+    biasfact = biasfact / biasfact.min()
+    min_log2FC = 2
+    max_p = 0.01
+    n = 200
+    approach = "topN"  # "topN", "logFC"
+    markers = []
+    for cstats in limma:
+        if approach == "topN":
+            idx = cstats["P.Value"] <= max_p
+            cmarkers = cstats.loc[idx, "logFC"]
+            cmarkers.index = cstats.index[idx]
+            cmarkers = cmarkers.sort_values(ascending=False).head(n).index.tolist()
+
+        elif approach == "logFC":
+            idx = (cstats["P.Value"] <= max_p) & (cstats["logFC"] >= min_log2FC)
+            cmarkers = cstats.index[idx].tolist()
+
+        markers = list(set(markers).union(cmarkers))
+    cpm_sig = cpm_sig * biasfact
+    cpm_sig = convert_to_cpm(cpm_sig)
+    result = cpm_sig.loc[markers, :]
+    return result
+
+
 def build_rectangle_signatures(
-    sc_counts: pd.DataFrame, annotations: pd.Series, convert_to_cpm=True, with_recursive_step=True
+    sc_counts: pd.DataFrame, annotations: pd.Series, with_recursive_step=True
 ) -> RectangleSignatureResult:
     """Builds rectangle signatures based on single-cell count data and annotations.
 
@@ -276,8 +368,6 @@ def build_rectangle_signatures(
         The single-cell count data as a DataFrame. DataFrame should have the genes as rows and cell as columns.
     annotations
         The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
-    convert_to_cpm
-        Indicates whether the count data should be converted to counts per million (CPM). Defaults to True.
     with_recursive_step
         Indicates whether to include the recursive clustering step. Defaults to True.
 
@@ -290,7 +380,7 @@ def build_rectangle_signatures(
     pseudo_signature = create_cpm_pseudo_signature(sc_counts, annotations)
 
     print("creating signature")
-    signature = signature_creation(sc_counts, annotations, convert_to_cpm)
+    signature = signature_creation(sc_counts, annotations)
 
     bias_factors = calculate_bias_factors(sc_counts, annotations, signature)
     signature = signature * bias_factors
@@ -306,7 +396,7 @@ def build_rectangle_signatures(
     assignments = get_fcluster_assignments(clusters, signature.columns)
     clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
 
-    clustered_signature = signature_creation(sc_counts, clustered_annotations, convert_to_cpm)
+    clustered_signature = signature_creation(sc_counts, clustered_annotations)
 
     clustered_bias_factors = calculate_bias_factors(sc_counts, clustered_annotations, clustered_signature)
     clustered_signature = clustered_signature * clustered_bias_factors
@@ -317,5 +407,57 @@ def build_rectangle_signatures(
         bias_factors=bias_factors,
         clustered_signature=clustered_signature,
         clustered_bias_factors=clustered_bias_factors,
+        assignments=assignments,
+    )
+
+
+def build_rectangle_signatures_limma(
+    sc_counts: pd.DataFrame, annotations: pd.Series, with_recursive_step=True
+) -> RectangleSignatureResult:
+    """Builds rectangle signatures based on single-cell count data and annotations.
+
+    Parameters
+    ----------
+    sc_counts
+        The single-cell count data as a DataFrame. DataFrame should have the genes as rows and cell as columns.
+    annotations
+        The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
+    with_recursive_step
+        Indicates whether to include the recursive clustering step. Defaults to True.
+
+    Returns
+    -------
+    The result of the rectangle signature analysis.
+    """
+    assert sc_counts is not None and annotations is not None
+
+    signature = sc_counts.groupby(annotations.values, axis=1).sum()
+    pseudo_signature = create_cpm_pseudo_signature(sc_counts, annotations)
+
+    print("creating signature")
+    signature = get_limma_genes_condition(signature, sc_counts, annotations)
+
+    if not with_recursive_step:
+        return RectangleSignatureResult(signature=signature, pseudo_signature=signature, bias_factors=None)
+
+    print("creating clustered signature")
+    linkage_matrix = create_linkage_matrix(signature)
+    clusters = create_fclusters(linkage_matrix, len(signature.columns) - 1)
+    assignments = None
+    clustered_signature = None
+    if len(set(clusters)) > 2:
+        assignments = get_fcluster_assignments(clusters, signature.columns)
+        clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
+
+        pseudo_clusterd_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
+
+        clustered_signature = get_limma_genes_condition(pseudo_clusterd_signature, sc_counts, annotations)
+
+    return RectangleSignatureResult(
+        signature=signature,
+        pseudo_signature=pseudo_signature,
+        bias_factors=None,
+        clustered_signature=clustered_signature,
+        clustered_bias_factors=None,
         assignments=assignments,
     )

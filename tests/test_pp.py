@@ -4,9 +4,8 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
+import src.rectanglepy as rectangle
 from scipy import sparse
-
-import rectanglepy as rectangle
 
 
 @pytest.fixture
@@ -55,6 +54,12 @@ def mast_data(data_dir):
     mast = pd.read_csv(data_dir / "df_for_mast.csv", index_col=0)
     groups = np.array(np.repeat("cluster_other", 53).tolist() + np.repeat("cluster_1", 47).tolist())
     return mast, groups
+
+
+@pytest.fixture
+def pseudo_count_sig(data_dir):
+    sig = pd.read_csv(data_dir / "pseudo_signature_counts.csv", index_col=0)
+    return sig
 
 
 @pytest.fixture
@@ -134,7 +139,7 @@ def test_de_analysis(small_data):
 
 def test_signature_creation(small_data, small_dwls_signature):
     sc_data, annotations = small_data
-    actual = rectangle.pp.signature_creation(sc_data, annotations, False).sort_index()
+    actual = rectangle.pp.signature_creation(sc_data, annotations).sort_index()
     expected = small_dwls_signature.sort_index()
     assert np.isclose(expected, actual, rtol=1e-05, atol=1e-05).all()
 
@@ -254,3 +259,17 @@ def test_convert_to_cpm(small_data):
     count_sc_data = small_data[0]
     cpm_sc_data = rectangle.pp.convert_to_cpm(count_sc_data)
     assert np.isclose(cpm_sc_data.iloc[1, 0], 179.69972)
+
+
+def test_limma(pseudo_count_sig):
+    countsig = pseudo_count_sig
+    limma = rectangle.pp.generate_limma(countsig)
+
+    assert len(limma["ILC"]) == 16743
+
+
+def test_limma_pseudo_sig(pseudo_count_sig, small_data):
+    sc_data, annotations = small_data
+    signature = sc_data.groupby(annotations.values, axis=1).sum()
+    result = rectangle.pp.get_limma_genes_condition(signature, sc_data, annotations)
+    assert len(result) == 7409

@@ -23,7 +23,7 @@ class RectangleSignatureResult:
     def __init__(
         self,
         signature: pd.DataFrame,
-        bias_factors: pd.Series,
+        bias_factors: pd.Series or None,
         pseudo_signature: pd.DataFrame,
         clustered_signature: pd.DataFrame = None,
         clustered_bias_factors: pd.Series = None,

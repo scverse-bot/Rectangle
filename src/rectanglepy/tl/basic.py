@@ -57,21 +57,32 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
 
 
 def find_dampening_constant(signature, bulk, qp_gld):
-    np.random.seed(1)  # make deterministic
-
+    solutions_std = []
+    np.random.seed(1)
     weights = np.square(1 / (np.dot(signature, qp_gld)))
     weights_scaled = scale_weights(weights)
     weights_scaled_no_inf = weights_scaled[weights_scaled != np.inf]
-    max_multiplier = min(math.ceil(np.log2(max(weights_scaled_no_inf))), 50)
-
+    qp_gld_sum = sum(qp_gld)
     # try multiple values of the dampening constant (multiplier)
     # for each, calculate the variance of the dampened weighted solution for a subset of genes
-    solutions_std = [
-        calculate_dampening_constant(bulk, signature, sum(qp_gld), weights_scaled, 2**i)
-        for i in range(max_multiplier)
-    ]
-    means = np.square(pd.DataFrame(solutions_std)).mean(axis=1)
-    return means.idxmin()
+    for i in range(math.ceil(np.log2(max(weights_scaled_no_inf)))):
+        solutions = []
+        multiplier = 2**i
+        weights_dampened = np.array([multiplier if multiplier <= x else x for x in weights_scaled]).astype("double")
+        for _j in range(80):
+            subset = np.random.choice(len(signature), size=len(signature) // 2, replace=False)
+            bulk_subset = bulk.iloc[list(subset)]
+            signature_subset = signature.iloc[subset, :]
+            fit = sm.WLS(bulk_subset, -1 + signature_subset, weights=weights_dampened[subset]).fit()
+            solution = fit.params * qp_gld_sum / sum(fit.params)
+            solutions.append(solution)
+        solutions_df = pd.DataFrame(solutions)
+
+        solutions_std.append(solutions_df.std(axis=0))
+    solutions_std_df = pd.DataFrame(solutions_std)
+    means = solutions_std_df.apply(lambda x: np.mean(x**2), axis=1)
+    best_dampening_constant = means.idxmin()
+    return best_dampening_constant
 
 
 def calculate_dampening_constant(bulk, signature, sum_qp_gld, weights_scaled, multiplier):
