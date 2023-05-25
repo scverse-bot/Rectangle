@@ -9,6 +9,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import importr
 from scipy.cluster.hierarchy import fcluster, linkage
+from sklearn.metrics import silhouette_score
 
 from .rectangle_signature import RectangleSignatureResult
 
@@ -187,8 +188,20 @@ def create_linkage_matrix(signature: pd.DataFrame):
     return linkage((np.log(signature + 1)).T, method=method, metric=metric)
 
 
-def create_fclusters(linkage_matrix, maxclust) -> list[int]:
-    clusters = fcluster(linkage_matrix, criterion="maxclust", t=maxclust)
+def sil_scores(X, Z, ts):
+    scores = []
+    for num_clust in ts:
+        scores.append(silhouette_score(X, fcluster(Z, t=num_clust, criterion="maxclust")))
+    return scores
+
+
+def create_fclusters(signature, linkage_matrix) -> list[int]:
+    min_number_clusters = min(3, len(signature.columns))
+    max_number_clusters = len(signature.columns) - 1
+    scores = sil_scores((np.log(signature + 1)).T, linkage_matrix, range(min_number_clusters, max_number_clusters))
+    # take max score
+    cluster_number = scores.index(max(scores)) + min_number_clusters
+    clusters = fcluster(linkage_matrix, criterion="maxclust", t=cluster_number)
     if len(set(clusters)) == 1:
         # default clustering clustered all cell types in same cluster, fallback to distance metric
         distance = linkage_matrix[0][2]
@@ -305,7 +318,6 @@ def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
     cpm_sig = convert_to_cpm(countsig)
     biasfact = (countsig > 0).sum(axis=0)
     biasfact = biasfact / biasfact.min()
-    cpm_sig = cpm_sig * biasfact
 
     min_log2FC = 1
     max_p = 0.02
@@ -325,6 +337,7 @@ def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
     optimal_condition_number = condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
     markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
     result = cpm_sig.loc[markers, :]
+    result = result * biasfact
     return result
 
 
@@ -337,9 +350,9 @@ def get_limma_genes(pseudo_count_sig):
     min_log2FC = 2
     max_p = 0.01
     n = 200
-    approach = "topN"  # "topN", "logFC"
+    approach = "logFC"  # "topN", "logFC"
     markers = []
-    for cstats in limma:
+    for cstats in limma.values():
         if approach == "topN":
             idx = cstats["P.Value"] <= max_p
             cmarkers = cstats.loc[idx, "logFC"]
@@ -392,7 +405,7 @@ def build_rectangle_signatures(
 
     print("creating clustered signature")
     linkage_matrix = create_linkage_matrix(signature)
-    clusters = create_fclusters(linkage_matrix, len(signature.columns) - 1)
+    clusters = create_fclusters(signature, linkage_matrix)
     assignments = get_fcluster_assignments(clusters, signature.columns)
     clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
 
@@ -407,7 +420,7 @@ def build_rectangle_signatures(
         bias_factors=bias_factors,
         clustered_signature=clustered_signature,
         clustered_bias_factors=clustered_bias_factors,
-        assignments=assignments,
+        cluster_assignments=assignments,
     )
 
 
@@ -442,16 +455,16 @@ def build_rectangle_signatures_limma(
 
     print("creating clustered signature")
     linkage_matrix = create_linkage_matrix(signature)
-    clusters = create_fclusters(linkage_matrix, len(signature.columns) - 1)
+    clusters = create_fclusters(signature, linkage_matrix)
     assignments = None
     clustered_signature = None
     if len(set(clusters)) > 2:
         assignments = get_fcluster_assignments(clusters, signature.columns)
         clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, signature)
 
-        pseudo_clusterd_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
+        clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
 
-        clustered_signature = get_limma_genes_condition(pseudo_clusterd_signature, sc_counts, annotations)
+        clustered_signature = get_limma_genes_condition(clustered_signature, sc_counts, annotations)
 
     return RectangleSignatureResult(
         signature=signature,
@@ -459,5 +472,5 @@ def build_rectangle_signatures_limma(
         bias_factors=None,
         clustered_signature=clustered_signature,
         clustered_bias_factors=None,
-        assignments=assignments,
+        cluster_assignments=assignments,
     )

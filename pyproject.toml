@@ -19,6 +19,7 @@ urls.Documentation = "https://rectanglepy.readthedocs.io/"
 urls.Source = "https://github.com/bernheder/Rectangle"
 urls.Home-page = "https://github.com/bernheder/Rectangle"
 dependencies = [
+    "scikit-learn",
     "anndata",
     # for debug logging (referenced from the issue template)
     "session-info",

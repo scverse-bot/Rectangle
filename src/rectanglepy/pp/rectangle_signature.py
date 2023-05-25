@@ -16,7 +16,7 @@ class RectangleSignatureResult:
         The clustered signature data as a DataFrame. Is only created when signature result is created with recursive step.
     clustered_bias_factors
         The bias factors associated with the clustered signature data.
-    assignments
+    cluster_assignments
         The assignments of signature cell-types to clusters.
     """
 
@@ -27,11 +27,11 @@ class RectangleSignatureResult:
         pseudo_signature: pd.DataFrame,
         clustered_signature: pd.DataFrame = None,
         clustered_bias_factors: pd.Series = None,
-        assignments: list[int or str] = None,
+        cluster_assignments: list[int or str] = None,
     ):
         self.signature = signature
         self.bias_factors = bias_factors
         self.pseudo_signature = pseudo_signature
         self.clustered_signature = clustered_signature
         self.clustered_bias_factors = clustered_bias_factors
-        self.assignments = assignments
+        self.assignments = cluster_assignments
