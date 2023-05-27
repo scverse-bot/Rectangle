@@ -122,7 +122,9 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     return pd.Series(approximate_solution, index=signature.columns)
 
 
-def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Series:
+def recursive_deconvolute(
+    signatures: RectangleSignatureResult, bulk: pd.Series, correct_for_unknown_content=True
+) -> pd.Series:
     """Performs recursive deconvolution using rectangle signatures and bulk data.
 
     Parameters
@@ -131,6 +133,8 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
         The rectangle signature result containing the signature data and results.
     bulk
         The bulk data for deconvolution.
+    correct_for_unknown_content
+        Whether to correct the estimated cell fractions for unknown cell content using the pseudo signature.
 
     Returns
     -------
@@ -145,27 +149,42 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
         - If a pseudo signature is available in the `signatures` object, the estimated cell fractions are corrected for unknow cell content using the pseudo signature and the bulk data.
     """
     print("deconvolute start fractions")
-    start_fractions = weighted_dampened_deconvolute(signatures.signature, bulk)
+    pseudobulk_sig_cpm = signatures.pseudobulk_sig_cpm
+    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
+    start_fractions = weighted_dampened_deconvolute(signature, bulk)
 
-    if signatures.clustered_signature is None:
+    if correct_for_unknown_content:
+        print("Correct for unknown cell content")
+        start_fractions = correct_for_unknown_cell_content(
+            bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
+        )
+
+    clustered_psuedobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
+
+    if clustered_psuedobulk_sig_cpm is None:
         print("Simple deconvolution without recursive step")
         return start_fractions
 
     print("Recursive deconvolution")
-    clustered_fractions = weighted_dampened_deconvolute(signatures.clustered_signature, bulk)
-    recursive_fractions = weighted_dampened_deconvolute(
-        signatures.signature, bulk, signatures.assignments, clustered_fractions
+    clustered_signature = (
+        clustered_psuedobulk_sig_cpm.loc[signatures.clustered_signature_genes] * signatures.clustered_bias_factors
     )
+    clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
+    if correct_for_unknown_content:
+        clustered_fractions = correct_for_unknown_cell_content(
+            bulk, clustered_psuedobulk_sig_cpm, clustered_fractions, signatures.clustered_bias_factors
+        )
+
+    recursive_fractions = weighted_dampened_deconvolute(signature, bulk, signatures.assignments, clustered_fractions)
 
     final_fractions = pd.concat([start_fractions, recursive_fractions]).groupby(level=0).mean()
-
-    if signatures.pseudo_signature is not None:
-        final_fractions = correct_for_unknown_cell_content(bulk, signatures.pseudo_signature, final_fractions)
 
     return final_fractions
 
 
-def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, pseudo_signature: pd.DataFrame = None) -> pd.Series:
+def direct_deconvolute(
+    signature: pd.DataFrame, bulk: pd.Series, pseudo_signature: pd.DataFrame = None, bias_factors=None
+) -> pd.Series:
     """Performs direct deconvolution using a signature and bulk data.
 
     Parameters
@@ -176,6 +195,8 @@ def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, pseudo_signatur
         The bulk data for deconvolution.
     pseudo_signature
         The pseudo signature data used to correct for unknown cell content. Defaults to None.
+    bias_factors
+        The bias factors used to correct for unknown cell content. Defaults to None.
 
     Returns
     -------
@@ -196,7 +217,7 @@ def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series, pseudo_signatur
 
     if pseudo_signature is not None:
         print("correct for unknown content")
-        fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions)
+        fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, bias_factors)
 
     return fractions
 
@@ -206,8 +227,7 @@ def create_scaling_factors(pseudo_signature: pd.DataFrame) -> pd.Series:
     return scaling / min(scaling)
 
 
-def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates):
-    scaling_factors = create_scaling_factors(pseudo_signature)
+def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates, bias_factors):
     genes = list(set(pseudo_signature.index) & set(bulk.index))
     signature = pseudo_signature.loc[genes].sort_index()
     bulk = bulk.loc[genes].sort_index()
@@ -215,14 +235,14 @@ def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates):
     # Reconstruct the bulk expression profiles through matrix multiplication
     # of the estimated cell fractions (weighted by the scaling factors) and
     # cell-type-specific expression profiles (i.e. signature)
-    bulk_est = pd.Series(np.dot(signature, (estimates.T * scaling_factors).T))
+    bulk_est = pd.Series(np.dot(signature, (estimates.T * bias_factors).T))
     bulk_est.index = signature.index
 
     # Calculate the unknown cellular content ad the difference of
     # per-sample overall expression levels in the true vs. reconstructed
     # bulk RNA-seq data, divided by the overall expression in the true bulk
     ukn_cc = (bulk - bulk_est).sum() / (bulk.sum())
-
+    ukn_cc = max(0, ukn_cc)
     # Correct (i.e. scale) the cell fraction estimates so that their sum
     # equals 1 - the unknown cellular content estimated above
     estimates_fix = estimates / estimates.sum() * (1 - ukn_cc)
