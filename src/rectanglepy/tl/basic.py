@@ -122,7 +122,7 @@ def recursive_deconvolute(
     bulk
         The bulk data for deconvolution.
     correct_for_unknown_content
-        Whether to correct the estimated cell fractions for unknown cell content using the pseudo signature.
+        Whether to correct the estimated cell fractions for unknown cell content.
 
     Returns
     -------

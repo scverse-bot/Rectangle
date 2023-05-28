@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import rpy2.robjects.packages as rpackages
-from anndata import AnnData
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
@@ -16,33 +14,35 @@ def convert_to_cpm(count_sc_data):
     return count_sc_data * 1e6 / np.sum(count_sc_data)
 
 
-def check_mast_install():
-    if not rpackages.isinstalled("BiocManager"):
-        print("BiocManager not installed")
-    if not rpackages.isinstalled("edgeR"):
-        print("edgeR is not installed")
-
-
 def create_condition_number_matrix(
     de_adjusted, sc_data: pd.DataFrame, max_gene_number: int, annotations
 ) -> pd.DataFrame:
-    genes = [find_signature_genes(max_gene_number, de_adjusted[annotation]) for annotation in de_adjusted]
-    genes = list({gene for sublist in genes for gene in sublist})
+    # Use a set to automatically handle duplicates
+    genes = set()
+    for annotation in de_adjusted:
+        genes.update(find_signature_genes(max_gene_number, de_adjusted[annotation]))
 
-    signature_columns = {
-        annotation: sc_data.loc[genes, annotations == annotation].mean(axis=1) for annotation in de_adjusted
-    }
+    # Convert set back to list for indexing
+    genes = list(genes)
 
-    return pd.DataFrame(signature_columns)
+    # Pre-calculate annotation conditions
+    annotation_conditions = {annotation: annotations == annotation for annotation in de_adjusted}
+
+    return pd.DataFrame(
+        {annotation: sc_data.loc[genes, annotation_conditions[annotation]].mean(axis=1) for annotation in de_adjusted}
+    )
 
 
 def create_condition_number_matrices(de_adjusted, sc_data, annotations):
     max_gene_number = 50
     condition_number_matrices = []
-    longest_de_analysis = max([len(de_adjusted[annotation]) for annotation in de_adjusted])
+    de_adjusted_lengths = {annotation: len(de_adjusted[annotation]) for annotation in de_adjusted}
+    longest_de_analysis = max(de_adjusted_lengths.values())
     loop_range = max_gene_number + 1 if longest_de_analysis < max_gene_number else min(longest_de_analysis + 1, 200)
+
     for i in range(max_gene_number, loop_range):
         condition_number_matrices.append(create_condition_number_matrix(de_adjusted, sc_data, i, annotations))
+
     return condition_number_matrices
 
 
@@ -102,68 +102,95 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     return pd.Series(cluster_annotations, index=annotations.index)
 
 
-def build_rectangle_signatures_adata(
-    adata: AnnData, convert_to_cpm=True, with_recursive_step=True
-) -> RectangleSignatureResult:
-    return build_rectangle_signatures(adata.to_df().T, adata.obs.iloc[:, 0], convert_to_cpm, with_recursive_step)
+def pandas_to_r(df):
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        return robjects.conversion.get_conversion().py2rpy(df)
+
+
+def r_to_pandas(df_r):
+    with localconverter(robjects.default_converter + pandas2ri.converter):
+        return robjects.conversion.get_conversion().rpy2py(df_r)
 
 
 def generate_limma(countsig):
     countsig = countsig[countsig.sum(axis=1) > 0]
     edgeR = importr("edgeR")
-    importr("base")
     limma = importr("limma")
-    importr("stats")
-    with localconverter(robjects.default_converter + pandas2ri.converter):
-        countsig_r = robjects.conversion.get_conversion().py2rpy(countsig)
+
+    countsig_r = pandas_to_r(countsig)
     dge_list = edgeR.DGEList(countsig_r)
     dge_list = edgeR.calcNormFactors(dge_list)
+
     cell_degs = {}
-    for i in range(0, len(countsig.columns)):
-        cell_type = countsig.columns[i]
+    for i, cell_type in enumerate(countsig.columns):
         groups = pd.Series(np.zeros(len(countsig.columns)))
         groups[i] = 1
-        ones = pd.Series(np.ones(len(countsig.columns)))
-        design = pd.DataFrame({"(intercept)": ones, "group" + str(i + 1): groups}).astype("int")
-        with localconverter(robjects.default_converter + pandas2ri.converter):
-            design_r = robjects.conversion.get_conversion().py2rpy(design)
+        design = pd.DataFrame({"(intercept)": np.ones(len(countsig.columns)), "group" + str(i + 1): groups}).astype(
+            "int"
+        )
 
-        v = limma.voom(dge_list, design_r, plot=False)
-        fit = limma.lmFit(v, design=design_r)
+        v = limma.voom(dge_list, pandas_to_r(design), plot=False)
+        fit = limma.lmFit(v, design=pandas_to_r(design))
         fit = limma.eBayes(fit)
-        degs_r = limma.topTable(fit, coef=2, n=len(countsig))
-        # convert back to pandas
-        with localconverter(robjects.default_converter + pandas2ri.converter):
-            degs = robjects.conversion.get_conversion().rpy2py(degs_r)
 
+        degs_r = limma.topTable(fit, coef=2, n=len(countsig))
+        degs = r_to_pandas(degs_r)
         degs = degs[degs["logFC"] > 0]
 
         cell_degs[cell_type] = degs
+
     return cell_degs
 
 
-def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
-    limma = generate_limma(pseudo_count_sig)
-
+def filter_de_analysis_results(de_analysis_result):
     min_log2FC = 1
     max_p = 0.02
+    """Helper function to filter differential expression analysis results"""
+    de_analysis_result["log2_fc"] = de_analysis_result["logFC"]
+    de_analysis_result["gene"] = de_analysis_result.index
+    return de_analysis_result[(de_analysis_result["P.Value"] < max_p) & (de_analysis_result["logFC"] > min_log2FC)]
 
-    de_analysis_adjusted = {}
-    for annotation in limma.keys():
-        de_analysis_result = limma[annotation]
-        de_analysis_result["log2_fc"] = de_analysis_result["logFC"]
-        de_analysis_result["gene"] = list(de_analysis_result.index)
-        de_analysis_adjusted[annotation] = de_analysis_result[
-            (de_analysis_result["P.Value"] < max_p) & (de_analysis_result["logFC"] > min_log2FC)
-        ]
 
-    condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
+def get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted):
+    """Helper function to calculate the optimal condition number."""
     condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
     smallest_de_analysis = min([len(de_analysis_adjusted[annotation]) for annotation in de_analysis_adjusted])
-    optimal_condition_number = condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
-    markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
+    return condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
 
+
+def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
+    limma_results = generate_limma(pseudo_count_sig)
+    de_analysis_adjusted = {
+        annotation: filter_de_analysis_results(result) for annotation, result in limma_results.items()
+    }
+
+    condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
+    optimal_condition_number = get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted)
+
+    markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
     return pd.Series(markers)
+
+
+def calculate_bias_factor_and_genes(pseudo_signature_counts, sc_counts, annotations):
+    """Helper function to calculate bias factor and signature genes."""
+    biasfact = (pseudo_signature_counts > 0).sum(axis=0)
+    biasfact = biasfact / biasfact.min()
+    genes = get_limma_genes_condition(pseudo_signature_counts, sc_counts, annotations)
+    pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
+    return biasfact, genes, pseudo_signature_counts
+
+
+def create_clustered_signature(pseudo_signature_counts, sc_counts, annotations, genes):
+    """Helper function to create clustered signature."""
+    linkage_matrix = create_linkage_matrix(pseudo_signature_counts.loc[genes])
+    clusters = create_fclusters(pseudo_signature_counts.loc[genes], linkage_matrix)
+    assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
+    clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, pseudo_signature_counts)
+    clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
+    clustered_biasfact = (clustered_signature > 0).sum(axis=0) / clustered_signature.min()
+    clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
+    clustered_signature = convert_to_cpm(clustered_signature)
+    return clustered_signature, clustered_biasfact, clustered_genes, assignments
 
 
 def build_rectangle_signatures(
@@ -189,33 +216,19 @@ def build_rectangle_signatures(
     pseudo_signature_counts = sc_counts.groupby(annotations.values, axis=1).sum()
 
     print("creating signature")
-    biasfact = (pseudo_signature_counts > 0).sum(axis=0)
-    biasfact = biasfact / biasfact.min()
-    genes = get_limma_genes_condition(pseudo_signature_counts, sc_counts, annotations)
-    pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
+    biasfact, genes, pseudo_signature_counts = calculate_bias_factor_and_genes(
+        pseudo_signature_counts, sc_counts, annotations
+    )
+
     if not with_recursive_step or len(pseudo_signature_counts.columns) < 4:
         return RectangleSignatureResult(
             signature_genes=genes, pseudobulk_sig_cpm=pseudo_signature_counts, bias_factors=biasfact
         )
 
     print("creating clustered signature")
-    linkage_matrix = create_linkage_matrix(pseudo_signature_counts.loc[genes])
-    clusters = create_fclusters(pseudo_signature_counts.loc[genes], linkage_matrix)
-    assignments = None
-    clustered_signature = None
-    clustered_biasfact = None
-    clustered_genes = None
-    if len(set(clusters)) > 2:
-        assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
-        clustered_annotations = create_annotations_from_cluster_labels(
-            assignments, annotations, pseudo_signature_counts
-        )
-
-        clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
-        clustered_biasfact = (clustered_signature > 0).sum(axis=0)
-        clustered_biasfact = clustered_biasfact / clustered_biasfact.min()
-        clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
-        clustered_signature = convert_to_cpm(clustered_signature)
+    clustered_signature, clustered_biasfact, clustered_genes, assignments = create_clustered_signature(
+        pseudo_signature_counts, sc_counts, annotations, genes
+    )
 
     return RectangleSignatureResult(
         signature_genes=genes,
