@@ -85,18 +85,6 @@ def find_dampening_constant(signature, bulk, qp_gld):
     return best_dampening_constant
 
 
-def calculate_dampening_constant(bulk, signature, sum_qp_gld, weights_scaled, multiplier):
-    weights_dampened = np.where(weights_scaled >= multiplier, multiplier, weights_scaled)
-    solutions = [solve_wls(bulk, signature, sum_qp_gld, weights_dampened) for _ in range(60)]
-    return np.std(pd.DataFrame(solutions))
-
-
-def solve_wls(bulk, signature, sum_qp_gld, weights_dampened):
-    subset = np.random.choice(len(signature), size=len(signature) // 2, replace=False)
-    params = sm.WLS(bulk[subset], -1 + signature.iloc[subset, :], weights=weights_dampened[subset]).fit().params
-    return params * sum_qp_gld / sum(params)
-
-
 def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_weights=None):
     genes = list(set(signature.index) & set(bulk.index))
     signature = signature.loc[genes].sort_index()
@@ -220,11 +208,6 @@ def direct_deconvolute(
         fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, bias_factors)
 
     return fractions
-
-
-def create_scaling_factors(pseudo_signature: pd.DataFrame) -> pd.Series:
-    scaling = (pseudo_signature > 0).sum()
-    return scaling / min(scaling)
 
 
 def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates, bias_factors):
