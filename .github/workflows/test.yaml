@@ -22,7 +22,7 @@ jobs:
             matrix:
                 python: ["3.10"]
                 os: [ubuntu-latest]
-                r: ["4.2"]
+                r: ["4.3"]
 
         env:
             OS: ${{ matrix.os }}
