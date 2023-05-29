@@ -4,8 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-
-import rectanglepy as rectangle
+import src.rectanglepy as rectangle
 
 
 @pytest.fixture
@@ -47,6 +46,12 @@ def rectangle_signature(data_dir):
 @pytest.fixture
 def finotello_bulk(data_dir):
     bulk = pd.read_csv(data_dir / "finotello_bulk.csv", index_col=0, header=0)
+    return bulk
+
+
+@pytest.fixture
+def dream_bulk(data_dir):
+    bulk = pd.read_csv(data_dir / "dream.csv", index_col=0, header=0)
     return bulk
 
 
@@ -149,3 +154,8 @@ def test_recursive_deconvolute(rectangle_signature, finotello_bulk):
             0.003623706964962541,
         ],
     ).all()
+
+
+def test_recursive_deconvolute_invalid_constraints(rectangle_signature, dream_bulk):
+    bulk = dream_bulk
+    rectangle.tl.recursive_deconvolute(rectangle_signature, bulk.iloc[:, 4])

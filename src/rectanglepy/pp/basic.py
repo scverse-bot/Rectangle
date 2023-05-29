@@ -171,28 +171,6 @@ def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
     return pd.Series(markers)
 
 
-def calculate_bias_factor_and_genes(pseudo_signature_counts, sc_counts, annotations):
-    """Helper function to calculate bias factor and signature genes."""
-    biasfact = (pseudo_signature_counts > 0).sum(axis=0)
-    biasfact = biasfact / biasfact.min()
-    genes = get_limma_genes_condition(pseudo_signature_counts, sc_counts, annotations)
-    pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
-    return biasfact, genes, pseudo_signature_counts
-
-
-def create_clustered_signature(pseudo_signature_counts, sc_counts, annotations, genes):
-    """Helper function to create clustered signature."""
-    linkage_matrix = create_linkage_matrix(pseudo_signature_counts.loc[genes])
-    clusters = create_fclusters(pseudo_signature_counts.loc[genes], linkage_matrix)
-    assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
-    clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, pseudo_signature_counts)
-    clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
-    clustered_biasfact = (clustered_signature > 0).sum(axis=0) / clustered_signature.min()
-    clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
-    clustered_signature = convert_to_cpm(clustered_signature)
-    return clustered_signature, clustered_biasfact, clustered_genes, assignments
-
-
 def build_rectangle_signatures(
     sc_counts: pd.DataFrame, annotations: pd.Series, with_recursive_step=True
 ) -> RectangleSignatureResult:
@@ -216,19 +194,33 @@ def build_rectangle_signatures(
     pseudo_signature_counts = sc_counts.groupby(annotations.values, axis=1).sum()
 
     print("creating signature")
-    biasfact, genes, pseudo_signature_counts = calculate_bias_factor_and_genes(
-        pseudo_signature_counts, sc_counts, annotations
-    )
-
+    biasfact = (pseudo_signature_counts > 0).sum(axis=0)
+    biasfact = biasfact / biasfact.min()
+    genes = get_limma_genes_condition(pseudo_signature_counts, sc_counts, annotations)
+    pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
     if not with_recursive_step or len(pseudo_signature_counts.columns) < 4:
         return RectangleSignatureResult(
             signature_genes=genes, pseudobulk_sig_cpm=pseudo_signature_counts, bias_factors=biasfact
         )
 
     print("creating clustered signature")
-    clustered_signature, clustered_biasfact, clustered_genes, assignments = create_clustered_signature(
-        pseudo_signature_counts, sc_counts, annotations, genes
-    )
+    linkage_matrix = create_linkage_matrix(pseudo_signature_counts.loc[genes])
+    clusters = create_fclusters(pseudo_signature_counts.loc[genes], linkage_matrix)
+    assignments = None
+    clustered_signature = None
+    clustered_biasfact = None
+    clustered_genes = None
+    if len(set(clusters)) > 2:
+        assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
+        clustered_annotations = create_annotations_from_cluster_labels(
+            assignments, annotations, pseudo_signature_counts
+        )
+
+        clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
+        clustered_biasfact = (clustered_signature > 0).sum(axis=0)
+        clustered_biasfact = clustered_biasfact / clustered_biasfact.min()
+        clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
+        clustered_signature = convert_to_cpm(clustered_signature)
 
     return RectangleSignatureResult(
         signature_genes=genes,
