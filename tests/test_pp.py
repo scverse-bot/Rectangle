@@ -88,6 +88,7 @@ def test_build_rectangle_signatures_non_recursive(test_hao):
 
 def test_build_rectangle_signatures_recursive(test_hao):
     sc_data, annotations = test_hao
+    sc_data = sc_data.astype(pd.SparseDtype("int", 0))
     actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations)
     assert actual.bias_factors[0] == 1.4037584525868847
     assert len(actual.signature_genes) == 1754

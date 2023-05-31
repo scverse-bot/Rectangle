@@ -27,10 +27,17 @@ def create_condition_number_matrix(
 
     # Pre-calculate annotation conditions
     annotation_conditions = {annotation: annotations == annotation for annotation in de_adjusted}
+    # Slice the DataFrame to keep only the relevant genes
+    sliced_sc_data = sc_data.loc[genes]
 
-    return pd.DataFrame(
-        {annotation: sc_data.loc[genes, annotation_conditions[annotation]].mean(axis=1) for annotation in de_adjusted}
-    )
+    # Create an empty DataFrame for the results
+    results = pd.DataFrame(index=genes)
+
+    # For each annotation, compute the mean and add it to the results DataFrame
+    for annotation in de_adjusted:
+        results[annotation] = sliced_sc_data.loc[:, annotation_conditions[annotation]].mean(axis=1)
+
+    return results
 
 
 def create_condition_number_matrices(de_adjusted, sc_data, annotations):
@@ -193,6 +200,10 @@ def build_rectangle_signatures(
 
     pseudo_signature_counts = sc_counts.groupby(annotations.values, axis=1).sum()
 
+    if any(pd.api.types.is_sparse(dtype) for dtype in pseudo_signature_counts.dtypes):
+        # pseudo signature can be dense, this is also more straightforward for the R conversion
+        pseudo_signature_counts = pseudo_signature_counts.sparse.to_dense()
+
     print("creating signature")
     biasfact = (pseudo_signature_counts > 0).sum(axis=0)
     biasfact = biasfact / biasfact.min()
@@ -217,6 +228,9 @@ def build_rectangle_signatures(
         )
 
         clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
+        if any(pd.api.types.is_sparse(dtype) for dtype in clustered_signature.dtypes):
+            # pseudo signature can be dense, this is also more straightforward for the R conversion
+            clustered_signature = clustered_signature.sparse.to_dense()
         clustered_biasfact = (clustered_signature > 0).sum(axis=0)
         clustered_biasfact = clustered_biasfact / clustered_biasfact.min()
         clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
