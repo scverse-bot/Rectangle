@@ -4,7 +4,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-import src.rectanglepy as rectangle
+
+import rectanglepy as rectangle
 
 
 @pytest.fixture

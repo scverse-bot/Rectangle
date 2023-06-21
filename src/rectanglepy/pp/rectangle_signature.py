@@ -2,18 +2,18 @@ import pandas as pd
 
 
 class RectangleSignatureResult:
-    """12Represents the result of a rectangle signature analysis.
+    """Represents the result of a rectangle signature analysis.
 
     Parameters
     ----------
     signature_genes
-        The signature data as a DataFrame.
+        The signature genes as a pd.Series.
     bias_factors
-        The bias factors associated with the signature data. Is already multiplied into the signature.
+        The bias factors associated with the signature data.
     pseudobulk_sig_cpm
-        The pseudo signature data as a DataFrame. Is used for correction of unknown content in the deconvolution step.
+        The pseudo bulk signature build from the single cell data, contains all genes.
     clustered_pseudobulk_sig_cpm
-        The clustered signature data as a DataFrame. Is only created when signature result is created with recursive step.
+        The  clustered pseudo bulk signature build from the single cell data, contains all genes.
     clustered_bias_factors
         The bias factors associated with the clustered signature data.
     cluster_assignments

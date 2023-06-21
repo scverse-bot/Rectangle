@@ -141,19 +141,18 @@ def recursive_deconvolute(
     print("deconvolute start fractions")
     pseudobulk_sig_cpm = signatures.pseudobulk_sig_cpm
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
-
+    bias_factors = signatures.bias_factors
+    clustered_bias_factors = signatures.clustered_bias_factors
     if not correct_for_mrna_bias:
-        signatures.bias_factors = pd.Series(1, index=pseudobulk_sig_cpm.columns)
-        signatures.clustered_bias_factors = pd.Series(1, index=clustered_pseudobulk_sig_cpm.columns)
+        bias_factors = pd.Series(1, index=pseudobulk_sig_cpm.columns)
+        clustered_bias_factors = pd.Series(1, index=clustered_pseudobulk_sig_cpm.columns)
 
-    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
+    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * bias_factors
     start_fractions = weighted_dampened_deconvolute(signature, bulk)
 
     if correct_for_unknown_content:
         print("Correct for unknown cell content")
-        start_fractions = correct_for_unknown_cell_content(
-            bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
-        )
+        start_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, start_fractions, bias_factors)
 
     if clustered_pseudobulk_sig_cpm is None:
         print("Simple deconvolution without recursive step")
@@ -161,17 +160,15 @@ def recursive_deconvolute(
 
     print("Recursive deconvolution")
     clustered_signature = (
-        clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * signatures.clustered_bias_factors
+        clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * clustered_bias_factors
     )
     clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
-    if correct_for_unknown_content:
-        clustered_fractions = correct_for_unknown_cell_content(
-            bulk, clustered_pseudobulk_sig_cpm, clustered_fractions, signatures.clustered_bias_factors
-        )
-        # remove last column, which is the unknown cell content
-        clustered_fractions = clustered_fractions[:-1]
-
     recursive_fractions = weighted_dampened_deconvolute(signature, bulk, signatures.assignments, clustered_fractions)
+
+    if correct_for_unknown_content:
+        recursive_fractions = correct_for_unknown_cell_content(
+            bulk, pseudobulk_sig_cpm, recursive_fractions, bias_factors
+        )
 
     final_fractions = pd.concat([start_fractions, recursive_fractions]).groupby(level=0).mean()
 

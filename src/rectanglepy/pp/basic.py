@@ -21,22 +21,10 @@ def create_condition_number_matrix(
     genes = set()
     for annotation in de_adjusted:
         genes.update(find_signature_genes(max_gene_number, de_adjusted[annotation]))
-
-    # Convert set back to list for indexing
-    genes = list(genes)
-
-    # Pre-calculate annotation conditions
-    annotation_conditions = {annotation: annotations == annotation for annotation in de_adjusted}
-    # Slice the DataFrame to keep only the relevant genes
-    sliced_sc_data = sc_data.loc[genes]
-
-    # Create an empty DataFrame for the results
-    results = pd.DataFrame(index=genes)
-
-    # For each annotation, compute the mean and add it to the results DataFrame
-    for annotation in de_adjusted:
-        results[annotation] = sliced_sc_data.loc[:, annotation_conditions[annotation]].mean(axis=1)
-
+    sliced_sc_data = sc_data.loc[list(genes)]
+    if any(pd.api.types.is_sparse(dtype) for dtype in sliced_sc_data.dtypes):
+        sliced_sc_data = sliced_sc_data.sparse.to_dense()
+    results = sliced_sc_data.groupby(annotations.values, axis=1).mean()
     return results
 
 
@@ -152,7 +140,6 @@ def generate_limma(countsig):
 def filter_de_analysis_results(de_analysis_result):
     min_log2FC = 1
     max_p = 0.02
-    """Helper function to filter differential expression analysis results"""
     de_analysis_result["log2_fc"] = de_analysis_result["logFC"]
     de_analysis_result["gene"] = de_analysis_result.index
     return de_analysis_result[(de_analysis_result["P.Value"] < max_p) & (de_analysis_result["logFC"] > min_log2FC)]
@@ -176,6 +163,11 @@ def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
 
     markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
     return pd.Series(markers)
+
+
+def create_bias_factors(countsig):
+    biasfactors = (countsig > 0).sum(axis=0)
+    return biasfactors / biasfactors.min()
 
 
 def build_rectangle_signatures(
@@ -205,10 +197,10 @@ def build_rectangle_signatures(
         pseudo_signature_counts = pseudo_signature_counts.sparse.to_dense()
 
     print("creating signature")
-    biasfact = (pseudo_signature_counts > 0).sum(axis=0)
-    biasfact = biasfact / biasfact.min()
+    biasfact = create_bias_factors(pseudo_signature_counts)
     genes = get_limma_genes_condition(pseudo_signature_counts, sc_counts, annotations)
     pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
+
     if not with_recursive_step or len(pseudo_signature_counts.columns) < 4:
         return RectangleSignatureResult(
             signature_genes=genes, pseudobulk_sig_cpm=pseudo_signature_counts, bias_factors=biasfact
@@ -217,10 +209,7 @@ def build_rectangle_signatures(
     print("creating clustered signature")
     linkage_matrix = create_linkage_matrix(pseudo_signature_counts.loc[genes])
     clusters = create_fclusters(pseudo_signature_counts.loc[genes], linkage_matrix)
-    assignments = None
-    clustered_signature = None
-    clustered_biasfact = None
-    clustered_genes = None
+    assignments, clustered_signature, clustered_biasfact, clustered_genes = None, None, None, None
     if len(set(clusters)) > 2:
         assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
         clustered_annotations = create_annotations_from_cluster_labels(
@@ -231,8 +220,8 @@ def build_rectangle_signatures(
         if any(pd.api.types.is_sparse(dtype) for dtype in clustered_signature.dtypes):
             # pseudo signature can be dense, this is also more straightforward for the R conversion
             clustered_signature = clustered_signature.sparse.to_dense()
-        clustered_biasfact = (clustered_signature > 0).sum(axis=0)
-        clustered_biasfact = clustered_biasfact / clustered_biasfact.min()
+
+        clustered_biasfact = create_bias_factors(clustered_signature)
         clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
         clustered_signature = convert_to_cpm(clustered_signature)
 
