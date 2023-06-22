@@ -40,9 +40,9 @@ def small_data(data_dir):
 
 
 @pytest.fixture
-def test_hao(data_dir):
-    sc_data = rds_to_df(data_dir / "hao1_matrix_counts.rds", True)
-    annotations = rds_to_df(data_dir / "hao1_celltype_annotations.rds")
+def hao_pseudo(data_dir):
+    sc_data = pd.read_csv(data_dir / "hao1_matrix_test.csv", index_col=0)
+    annotations = list(pd.read_csv(data_dir / "hao1_celltype_annotations_test.csv", header=0, index_col=0).index)
     annotations = pd.Series(annotations, index=sc_data.columns)
     return sc_data, annotations
 
@@ -60,7 +60,7 @@ def test_create_linkage_matrix(hao_signature):
 
 def test_create_fclusters(hao_signature):
     linkage_matrix = rectangle.pp.create_linkage_matrix(hao_signature)
-    clusters = rectangle.pp.create_fclusters(hao_signature, linkage_matrix)
+    clusters = rectangle.pp.create_signature.create_fclusters(hao_signature, linkage_matrix)
     assert clusters == [2, 3, 3, 4, 1, 5, 3, 1, 2, 6, 3]
 
 
@@ -97,20 +97,20 @@ def test_create_annotations_from_cluster_labels(hao_signature):
     assert list(annotations_from_cluster) == ["NK cells", "pDC", "1", "3", "3", "Platelet", "1", "2", "3", "3", "2"]
 
 
-def test_build_rectangle_signatures_non_recursive(test_hao):
-    sc_data, annotations = test_hao
+def test_build_rectangle_signatures_non_recursive(hao_pseudo):
+    sc_data, annotations = hao_pseudo
+    sc_data = sc_data.astype(pd.SparseDtype("int32", 0))
     actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False)
     assert actual.assignments is None
     assert actual.bias_factors[0] == 1.4037584525868847
     assert len(actual.signature_genes) == 1754
 
 
-def test_build_rectangle_signatures_recursive(test_hao):
-    sc_data, annotations = test_hao
-    sc_data = sc_data.astype(pd.SparseDtype("int32", 0))
+def test_build_rectangle_signatures_recursive(hao_pseudo):
+    sc_data, annotations = hao_pseudo
     actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations)
     assert actual.bias_factors[0] == 1.4037584525868847
-    assert len(actual.signature_genes) == 1635
+    assert len(actual.signature_genes) == 1754
     assert len(actual.clustered_signature_genes) == 1188
     assert len(actual.clustered_bias_factors) == 6
 

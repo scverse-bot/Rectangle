@@ -5,7 +5,7 @@ import pandas as pd
 import quadprog
 import statsmodels.api as sm
 
-from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
+from rectanglepy.pp import RectangleSignatureResult
 
 
 def scale_weights(weights):
@@ -143,6 +143,7 @@ def recursive_deconvolute(
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
     bias_factors = signatures.bias_factors
     clustered_bias_factors = signatures.clustered_bias_factors
+
     if not correct_for_mrna_bias:
         bias_factors = pd.Series(1, index=pseudobulk_sig_cpm.columns)
         clustered_bias_factors = pd.Series(1, index=clustered_pseudobulk_sig_cpm.columns)

@@ -1,4 +1,4 @@
-from .basic import (
+from .create_signature import (
     build_rectangle_signatures,
     convert_to_cpm,
     create_annotations_from_cluster_labels,

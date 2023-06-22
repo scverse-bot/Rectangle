@@ -1,4 +1,4 @@
-from .basic import (
+from .deconvolution import (
     correct_for_unknown_cell_content,
     direct_deconvolute,
     recursive_deconvolute,
