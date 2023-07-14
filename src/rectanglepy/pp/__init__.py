@@ -5,5 +5,6 @@ from .create_signature import (
     create_fclusters,
     create_linkage_matrix,
     get_fcluster_assignments,
+    pandas_to_r,
 )
 from .rectangle_signature import RectangleSignatureResult

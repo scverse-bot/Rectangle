@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from pydeseq2.dds import DeseqDataSet
+from pydeseq2.ds import DeseqStats
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
@@ -137,12 +139,16 @@ def generate_limma(countsig):
     return cell_degs
 
 
-def filter_de_analysis_results(de_analysis_result):
-    min_log2FC = 1
-    max_p = 0.02
-    de_analysis_result["log2_fc"] = de_analysis_result["logFC"]
+def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
+    min_log2FC = logfc
+    max_p = p
+    de_analysis_result["log2_fc"] = de_analysis_result["log2FoldChange"]
     de_analysis_result["gene"] = de_analysis_result.index
-    return de_analysis_result[(de_analysis_result["P.Value"] < max_p) & (de_analysis_result["logFC"] > min_log2FC)]
+    adjusted_result = de_analysis_result[
+        (de_analysis_result["pvalue"] < max_p) & (de_analysis_result["log2_fc"] > min_log2FC)
+    ]
+    print(f"Found {len(adjusted_result)} genes for {annotation}\n")
+    return adjusted_result
 
 
 def get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted):
@@ -165,13 +171,49 @@ def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
     return pd.Series(markers)
 
 
+def generate_deseq2(countsig):
+    results = {}
+    count_df = countsig[countsig.sum(axis=1) > 0].T
+    for i, cell_type in enumerate(countsig.columns):
+        condition = np.zeros(len(countsig.columns))
+        condition[i] = 1
+        clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
+        dds = DeseqDataSet(counts=count_df, clinical=clinical_df, design_factors="condition")
+        dds.deseq2()
+        stat_res = DeseqStats(dds)
+        stat_res.summary()
+        stat_res.lfc_shrink()
+        results[cell_type] = stat_res.results_df
+
+    return results
+
+
+def get_deseq2_genes_condition(pseudo_count_sig, sc_data, annotations, p, logfc):
+    deseq_results = generate_deseq2(pseudo_count_sig)
+    # write_limma_results
+    import pickle
+
+    with open("./deseq.pickle", "wb") as handle:
+        pickle.dump(deseq_results, handle)
+    de_analysis_adjusted = {
+        annotation: filter_de_analysis_results(result, p, logfc, annotation)
+        for annotation, result in deseq_results.items()
+    }
+
+    condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
+    optimal_condition_number = get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted)
+
+    markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
+    return pd.Series(markers)
+
+
 def create_bias_factors(countsig):
     biasfactors = (countsig > 0).sum(axis=0)
     return biasfactors / biasfactors.min()
 
 
 def build_rectangle_signatures(
-    sc_counts: pd.DataFrame, annotations: pd.Series, with_recursive_step=True
+    sc_counts: pd.DataFrame, annotations: pd.Series, p, logfc, with_recursive_step=True
 ) -> RectangleSignatureResult:
     """Builds rectangle signatures based on single-cell count data and annotations.
 
@@ -181,6 +223,10 @@ def build_rectangle_signatures(
         The single-cell count data as a DataFrame. DataFrame should have the genes as rows and cell as columns.
     annotations
         The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
+    p
+        The p-value threshold for the DE analysis.
+    logfc
+        The log fold change threshold for the DE analysis.
     with_recursive_step
         Indicates whether to include the recursive clustering step. Defaults to True.
 
@@ -198,7 +244,7 @@ def build_rectangle_signatures(
 
     print("creating signature")
     biasfact = create_bias_factors(pseudo_signature_counts)
-    genes = get_limma_genes_condition(pseudo_signature_counts, sc_counts, annotations)
+    genes = get_deseq2_genes_condition(pseudo_signature_counts, sc_counts, annotations, p, logfc)
     pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
 
     if not with_recursive_step or len(pseudo_signature_counts.columns) < 4:
@@ -222,7 +268,7 @@ def build_rectangle_signatures(
             clustered_signature = clustered_signature.sparse.to_dense()
 
         clustered_biasfact = create_bias_factors(clustered_signature)
-        clustered_genes = get_limma_genes_condition(clustered_signature, sc_counts, clustered_annotations)
+        clustered_genes = get_deseq2_genes_condition(clustered_signature, sc_counts, clustered_annotations, p, logfc)
         clustered_signature = convert_to_cpm(clustered_signature)
 
     return RectangleSignatureResult(
