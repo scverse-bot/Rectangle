@@ -4,8 +4,7 @@ import numpy as np
 import pandas as pd
 import quadprog
 import statsmodels.api as sm
-
-from rectanglepy.pp import RectangleSignatureResult
+from src.rectanglepy.pp import RectangleSignatureResult
 
 
 def scale_weights(weights):
@@ -69,7 +68,7 @@ def find_dampening_constant(signature, bulk, qp_gld):
         solutions = []
         multiplier = 2**i
         weights_dampened = np.array([multiplier if multiplier <= x else x for x in weights_scaled]).astype("double")
-        for _j in range(80):
+        for _j in range(64):
             subset = np.random.choice(len(signature), size=len(signature) // 2, replace=False)
             bulk_subset = bulk.iloc[list(subset)]
             signature_subset = signature.iloc[subset, :]
@@ -94,7 +93,7 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     dampening_constant = find_dampening_constant(signature, bulk, approximate_solution)
     multiplier = 2**dampening_constant
 
-    max_iterations = 1000
+    max_iterations = 800
     convergence_threshold = 0.01
     change = 1
     iterations = 0

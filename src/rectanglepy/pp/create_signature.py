@@ -152,14 +152,14 @@ def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
 
 
 def get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted):
-    """Helper function to calculate the optimal condition number."""
     condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
-    smallest_de_analysis = min([len(de_analysis_adjusted[annotation]) for annotation in de_analysis_adjusted])
-    return condition_numbers.index(min(condition_numbers)) + 1 + min([49, smallest_de_analysis - 1])
+    return condition_numbers.index(min(condition_numbers)) + 50
 
 
 def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
     limma_results = generate_limma(pseudo_count_sig)
+    # save to pickle
+
     de_analysis_adjusted = {
         annotation: filter_de_analysis_results(result) for annotation, result in limma_results.items()
     }
@@ -171,7 +171,7 @@ def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
     return pd.Series(markers)
 
 
-def generate_deseq2(countsig):
+def generate_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
     results = {}
     count_df = countsig[countsig.sum(axis=1) > 0].T
     for i, cell_type in enumerate(countsig.columns):
@@ -190,21 +190,24 @@ def generate_deseq2(countsig):
 
 def get_deseq2_genes_condition(pseudo_count_sig, sc_data, annotations, p, logfc):
     deseq_results = generate_deseq2(pseudo_count_sig)
-    # write_limma_results
     import pickle
 
-    with open("./deseq.pickle", "wb") as handle:
+    with open("./deseq_mouse.pickle", "wb") as handle:
         pickle.dump(deseq_results, handle)
+
+    markers = get_marker_genes(annotations, deseq_results, logfc, p, sc_data)
+    return pd.Series(markers)
+
+
+def get_marker_genes(annotations, deseq_results, logfc, p, sc_data):
     de_analysis_adjusted = {
         annotation: filter_de_analysis_results(result, p, logfc, annotation)
         for annotation, result in deseq_results.items()
     }
-
     condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
     optimal_condition_number = get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted)
-
     markers = create_condition_number_matrix(de_analysis_adjusted, sc_data, optimal_condition_number, annotations).index
-    return pd.Series(markers)
+    return markers
 
 
 def create_bias_factors(countsig):

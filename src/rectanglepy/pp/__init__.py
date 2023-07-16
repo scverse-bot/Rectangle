@@ -4,7 +4,10 @@ from .create_signature import (
     create_annotations_from_cluster_labels,
     create_fclusters,
     create_linkage_matrix,
+    filter_de_analysis_results,
     get_fcluster_assignments,
+    get_marker_genes,
     pandas_to_r,
 )
+from .optimize_parameter import ParameterOptimizer
 from .rectangle_signature import RectangleSignatureResult

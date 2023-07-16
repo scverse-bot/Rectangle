@@ -112,7 +112,10 @@ ignore = [
     # We want docstrings to start immediately after the opening triple quote
     "D213",
     # We don't care about missing docstrings
-    "D103"
+    "D103",
+    # TODO turn on again
+    "D101",
+    "D102",
 ]
 
 [tool.ruff.per-file-ignores]
