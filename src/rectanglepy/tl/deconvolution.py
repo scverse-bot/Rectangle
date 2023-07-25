@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import quadprog
 import statsmodels.api as sm
-from src.rectanglepy.pp import RectangleSignatureResult
+
+from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
 
 
 def scale_weights(weights):
@@ -31,7 +32,7 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
     # Constraint 1: sum of all fractions is below or equal to 1
     C1 = -np.ones((n_genes, 1))
     b1 = -np.ones(1)
-    # Constraint 2: every fraction is greater than 0
+    # Constraint 2: every fraction is greater or equal to 0
     C2 = np.eye(n_genes)
     b2 = np.zeros(n_genes)
     # Constraint 3: if a previous solution is provided, the new solution should be similar to the previous one
@@ -216,6 +217,11 @@ def direct_deconvolute(
 
 
 def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates, bias_factors):
+    if estimates.sum() == 0:
+        estimates_fix = estimates
+        estimates_fix.loc["Unknown"] = 0
+        return estimates_fix
+
     genes = list(set(pseudo_signature.index) & set(bulk.index))
     signature = pseudo_signature.loc[genes].sort_index()
     bulk = bulk.loc[genes].sort_index()
