@@ -34,7 +34,7 @@ def create_condition_number_matrices(de_adjusted, sc_data, annotations):
     de_adjusted_lengths = {annotation: len(de_adjusted[annotation]) for annotation in de_adjusted}
     longest_de_analysis = max(de_adjusted_lengths.values())
     loop_range = min(longest_de_analysis, 200)
-    min_number = 1 if loop_range < 50 else 50
+    min_number = 3 if loop_range < 50 else 50
     for i in range(min_number, loop_range):
         condition_number_matrices.append(create_condition_number_matrix(de_adjusted, sc_data, i, annotations))
 
