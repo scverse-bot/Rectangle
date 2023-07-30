@@ -24,7 +24,8 @@ dependencies = [
     # for debug logging (referenced from the issue template)
     "session-info",
     "statsmodels",
-    "quadprog"
+    "quadprog",
+    "pydeseq2"
 ]
 
 [project.optional-dependencies]
