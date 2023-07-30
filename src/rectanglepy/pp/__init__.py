@@ -7,6 +7,5 @@ from .create_signature import (
     filter_de_analysis_results,
     get_fcluster_assignments,
     get_marker_genes,
-    pandas_to_r,
 )
 from .rectangle_signature import RectangleSignatureResult
