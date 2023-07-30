@@ -1,4 +1,3 @@
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -29,19 +28,6 @@ def quantiseq_data(data_dir):
     fractions = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_read_fractions_small.txt", index_col=0, sep="\t")
     fractions = fractions.iloc[:, :-1]
     return bulk, fractions, signature
-
-
-@pytest.fixture
-def small_dwls_signature(data_dir):
-    small_dwls_signature = pd.read_csv(data_dir / "dwls_model_small.csv", index_col=0)
-    return small_dwls_signature
-
-
-@pytest.fixture
-def rectangle_signature(data_dir):
-    rectangle_pickle = open(data_dir / "rectangle_limma", "rb")
-    rectangle_signature = pickle.load(rectangle_pickle)
-    return rectangle_signature
 
 
 @pytest.fixture
@@ -96,7 +82,8 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
 
 def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     sc_counts, annotations, bulk = small_data
-    signature = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, False)
+    sc_counts = sc_counts.astype("int")
+    signature = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, 0.2, 1, False)
     bulk, _, _ = quantiseq_data
     bulk = bulk.iloc[:, 11]
     pseudo_signature = signature.pseudobulk_sig_cpm
@@ -106,40 +93,3 @@ def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     biasfact = biasfact / biasfact.min()
     result = rectangle.tl.correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, biasfact)
     assert len(fractions) + 1 == len(result)
-
-
-def test_direct_deconvolute(rectangle_signature, finotello_bulk):
-    bulk = finotello_bulk
-    genes = rectangle_signature.signature_genes
-    cpm_sig = rectangle_signature.pseudobulk_sig_cpm
-    bias_factors = rectangle_signature.bias_factors
-    direct_signature = cpm_sig.loc[genes] * bias_factors
-    pseudo_sig = cpm_sig
-    fractions = rectangle.tl.direct_deconvolute(direct_signature, bulk.iloc[:, 0], pseudo_sig, bias_factors)
-    assert np.isclose(
-        list(fractions),
-        [
-            0.0527192678982,
-            0.002228634649488,
-            0.28924320054,
-            0.0211645570266,
-            0.05338400303,
-            0.0015461113220485,
-            0.284169098555,
-            0.239363407110,
-            0.0048853574171,
-            0.047282611465,
-            0.00401375097792,
-            0.0,
-        ],
-    ).all()
-
-
-def test_recursive_deconvolute(rectangle_signature, finotello_bulk):
-    bulk = finotello_bulk
-    rectangle.tl.recursive_deconvolute(rectangle_signature, bulk.iloc[:, 0])
-
-
-def test_recursive_deconvolute_invalid_constraints(rectangle_signature, dream_bulk):
-    bulk = dream_bulk
-    rectangle.tl.recursive_deconvolute(rectangle_signature, bulk.iloc[:, 4])

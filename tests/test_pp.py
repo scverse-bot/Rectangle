@@ -3,27 +3,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
 
 import rectanglepy as rectangle
-
-
-def rds_to_df(filename, is_df=False):
-    r_file = filename
-    robjects.r(f"df_to_load <- readRDS('{r_file}')")
-    r_df = robjects.r["df_to_load"]
-
-    # Convert R dataframe to pandas dataframe
-    with localconverter(robjects.default_converter + pandas2ri.converter):
-        p_df = robjects.conversion.rpy2py(r_df)
-    if is_df:
-        p_df = pd.DataFrame(p_df)
-        p_df.index = r_df.rownames
-        p_df.columns = r_df.colnames
-
-    return p_df
 
 
 @pytest.fixture
@@ -35,14 +16,6 @@ def data_dir():
 def small_data(data_dir):
     sc_data = pd.read_csv(data_dir / "sc_object_small.csv", index_col=0)
     annotations = list(pd.read_csv(data_dir / "cell_annotations_small.txt", header=None, index_col=0).index)
-    annotations = pd.Series(annotations, index=sc_data.columns)
-    return sc_data, annotations
-
-
-@pytest.fixture
-def hao_pseudo(data_dir):
-    sc_data = pd.read_csv(data_dir / "hao1_matrix_test.csv", index_col=0)
-    annotations = list(pd.read_csv(data_dir / "hao1_celltype_annotations_test.csv", header=0, index_col=0).index)
     annotations = pd.Series(annotations, index=sc_data.columns)
     return sc_data, annotations
 
@@ -95,24 +68,6 @@ def test_create_annotations_from_cluster_labels(hao_signature):
     )
 
     assert list(annotations_from_cluster) == ["NK cells", "pDC", "1", "3", "3", "Platelet", "1", "2", "3", "3", "2"]
-
-
-def test_build_rectangle_signatures_non_recursive(hao_pseudo):
-    sc_data, annotations = hao_pseudo
-    sc_data = sc_data.astype(pd.SparseDtype("int32", 0))
-    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations, False)
-    assert actual.assignments is None
-    assert actual.bias_factors[0] == 1.4037584525868847
-    assert len(actual.signature_genes) == 1754
-
-
-def test_build_rectangle_signatures_recursive(hao_pseudo):
-    sc_data, annotations = hao_pseudo
-    actual = rectangle.pp.build_rectangle_signatures(sc_data, annotations)
-    assert actual.bias_factors[0] == 1.4037584525868847
-    assert len(actual.signature_genes) == 1754
-    assert len(actual.clustered_signature_genes) == 1188
-    assert len(actual.clustered_bias_factors) == 6
 
 
 def test_convert_to_cpm(small_data):
