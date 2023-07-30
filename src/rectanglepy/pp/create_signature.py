@@ -281,7 +281,8 @@ def generate_pseudo_bulks(sc_data, annotations):
     split_size = 60
     bulks = []
     real_fractions = []
-
+    # set seed
+    np.random.seed(1)
     for _ in range(number_of_bulks):
         indices = []
         cell_numbers = []
