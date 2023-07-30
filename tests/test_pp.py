@@ -3,27 +3,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
 
 import rectanglepy as rectangle
-
-
-def rds_to_df(filename, is_df=False):
-    r_file = filename
-    robjects.r(f"df_to_load <- readRDS('{r_file}')")
-    r_df = robjects.r["df_to_load"]
-
-    # Convert R dataframe to pandas dataframe
-    with localconverter(robjects.default_converter + pandas2ri.converter):
-        p_df = robjects.conversion.rpy2py(r_df)
-    if is_df:
-        p_df = pd.DataFrame(p_df)
-        p_df.index = r_df.rownames
-        p_df.columns = r_df.colnames
-
-    return p_df
 
 
 @pytest.fixture
