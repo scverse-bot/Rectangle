@@ -9,5 +9,4 @@ from .create_signature import (
     get_marker_genes,
     pandas_to_r,
 )
-from .optimize_parameter import ParameterOptimizer
 from .rectangle_signature import RectangleSignatureResult

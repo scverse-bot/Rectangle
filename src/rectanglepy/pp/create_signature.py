@@ -237,6 +237,7 @@ def build_rectangle_signatures(
     annotations
         The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
     p
+    p
         The p-value threshold for the DE analysis.
     lfc
         The log fold change threshold for the DE analysis.

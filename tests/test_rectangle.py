@@ -2,13 +2,14 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from src.rectanglepy.pp.create_signature import (
+
+from rectanglepy.pp.create_signature import (
     generate_deseq2,
     generate_estimated_fractions,
     generate_pseudo_bulks,
     optimize_parameters,
 )
-from src.rectanglepy.rectangle import rectangle
+from rectanglepy.rectangle import rectangle
 
 
 @pytest.fixture
