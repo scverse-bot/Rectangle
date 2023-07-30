@@ -2,10 +2,6 @@ import numpy as np
 import pandas as pd
 from pydeseq2.dds import DeseqDataSet
 from pydeseq2.ds import DeseqStats
-from rpy2 import robjects
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
-from rpy2.robjects.packages import importr
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.stats import pearsonr
 from sklearn.metrics import silhouette_score
@@ -101,46 +97,6 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     return pd.Series(cluster_annotations, index=annotations.index)
 
 
-def pandas_to_r(df):
-    with localconverter(robjects.default_converter + pandas2ri.converter):
-        return robjects.conversion.get_conversion().py2rpy(df)
-
-
-def r_to_pandas(df_r):
-    with localconverter(robjects.default_converter + pandas2ri.converter):
-        return robjects.conversion.get_conversion().rpy2py(df_r)
-
-
-def generate_limma(countsig):
-    countsig = countsig[countsig.sum(axis=1) > 0]
-    edgeR = importr("edgeR")
-    limma = importr("limma")
-
-    countsig_r = pandas_to_r(countsig)
-    dge_list = edgeR.DGEList(countsig_r)
-    dge_list = edgeR.calcNormFactors(dge_list)
-
-    cell_degs = {}
-    for i, cell_type in enumerate(countsig.columns):
-        groups = pd.Series(np.zeros(len(countsig.columns)))
-        groups[i] = 1
-        design = pd.DataFrame({"(intercept)": np.ones(len(countsig.columns)), "group" + str(i + 1): groups}).astype(
-            "int"
-        )
-
-        v = limma.voom(dge_list, pandas_to_r(design), plot=False)
-        fit = limma.lmFit(v, design=pandas_to_r(design))
-        fit = limma.eBayes(fit)
-
-        degs_r = limma.topTable(fit, coef=2, n=len(countsig))
-        degs = r_to_pandas(degs_r)
-        degs = degs[degs["logFC"] > 0]
-
-        cell_degs[cell_type] = degs
-
-    return cell_degs
-
-
 def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
     min_log2FC = logfc
     max_p = p
@@ -163,22 +119,6 @@ def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
 def get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted):
     condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
     return condition_numbers.index(min(condition_numbers)) + 50
-
-
-def get_limma_genes_condition(pseudo_count_sig, sc_data, annotations):
-    limma_results = generate_limma(pseudo_count_sig)
-    # save to pickle
-
-    de_analysis_adjusted = {
-        annotation: filter_de_analysis_results(result) for annotation, result in limma_results.items()
-    }
-
-    condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
-    condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
-    optimal_condition_matrix = condition_number_matrices[condition_numbers.index(min(condition_numbers))]
-
-    markers = optimal_condition_matrix.index
-    return pd.Series(markers)
 
 
 def generate_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
