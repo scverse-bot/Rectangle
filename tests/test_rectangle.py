@@ -41,7 +41,7 @@ def test_generate_estimated_fractions(small_data_rectangle):
     pseudo_signature_counts = sc_data.groupby(annotations.values, axis=1).sum()
     de_results = generate_deseq2(pseudo_signature_counts)
     estimated_fractions = generate_estimated_fractions(
-        pseudo_signature_counts, bulks, 0.02, 1, de_results, sc_data, annotations
+        pseudo_signature_counts, bulks, 0.9, 0.1, de_results, sc_data, annotations
     )
 
     assert estimated_fractions.shape == (3, 30)

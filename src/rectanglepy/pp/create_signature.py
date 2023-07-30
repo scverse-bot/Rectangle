@@ -116,11 +116,6 @@ def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
     return adjusted_result
 
 
-def get_optimal_condition_number(condition_number_matrices, de_analysis_adjusted):
-    condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
-    return condition_numbers.index(min(condition_numbers)) + 50
-
-
 def generate_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
     results = {}
     count_df = countsig[countsig.sum(axis=1) > 0].T
