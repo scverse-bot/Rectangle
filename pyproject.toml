@@ -23,7 +23,6 @@ dependencies = [
     "anndata",
     # for debug logging (referenced from the issue template)
     "session-info",
-    "rpy2",
     "statsmodels",
     "quadprog"
 ]
