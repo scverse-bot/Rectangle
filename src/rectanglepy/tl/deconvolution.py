@@ -70,7 +70,7 @@ def find_dampening_constant(signature, bulk, qp_gld):
         solutions = []
         multiplier = 2**i
         weights_dampened = np.array([multiplier if multiplier <= x else x for x in weights_scaled]).astype("double")
-        for _j in range(64):
+        for _ in range(86):
             subset = np.random.choice(len(signature), size=len(signature) // 2, replace=False)
             bulk_subset = bulk.iloc[list(subset)]
             signature_subset = signature.iloc[subset, :]
@@ -95,7 +95,7 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     dampening_constant = find_dampening_constant(signature, bulk, approximate_solution)
     multiplier = 2**dampening_constant
 
-    max_iterations = 800
+    max_iterations = 1000
     convergence_threshold = 0.01
     change = 1
     iterations = 0
@@ -120,10 +120,6 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
         The rectangle signature result containing the signature data and results.
     bulk
         The bulk data for deconvolution.
-    correct_for_unknown_content
-        Whether to correct the estimated cell fractions for unknown cell content.
-    correct_for_mrna_bias
-        Whether to correct the signature  for mRNA bias.
 
     Returns
     -------
@@ -138,15 +134,16 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
         - If a pseudo signature is available in the `signatures` object, the estimated cell fractions are corrected for unknow cell content using the pseudo signature and the bulk data.
     """
     logger.info(f"Deconvolute fractions for bulk: {bulk.name}")
+
     pseudobulk_sig_cpm = signatures.pseudobulk_sig_cpm
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
-    bias_factors = signatures.bias_factors
-    clustered_bias_factors = signatures.clustered_bias_factors
 
-    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * bias_factors
+    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
     start_fractions = weighted_dampened_deconvolute(signature, bulk)
 
-    start_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, start_fractions, bias_factors)
+    start_fractions = correct_for_unknown_cell_content(
+        bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
+    )
 
     if clustered_pseudobulk_sig_cpm is None:
         logger.info("Direct deconvolution without recursive step returning result")
@@ -154,21 +151,21 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
 
     logger.info("Recursive deconvolution")
     clustered_signature = (
-        clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * clustered_bias_factors
+        clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * signatures.clustered_bias_factors
     )
     clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
     recursive_fractions = weighted_dampened_deconvolute(signature, bulk, signatures.assignments, clustered_fractions)
 
-    recursive_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, recursive_fractions, bias_factors)
+    recursive_fractions = correct_for_unknown_cell_content(
+        bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
+    )
 
     final_fractions = pd.concat([start_fractions, recursive_fractions]).groupby(level=0).mean()
     logger.info("Deconvolution complete")
     return final_fractions
 
 
-def direct_deconvolute(
-    signature: pd.DataFrame, bulk: pd.Series, pseudo_signature: pd.DataFrame = None, bias_factors=None
-) -> pd.Series:
+def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series) -> pd.Series:
     """Performs direct deconvolution using a signature and bulk data.
 
     Parameters
@@ -177,10 +174,6 @@ def direct_deconvolute(
         The signature data for deconvolution.
     bulk
         The bulk data for deconvolution.
-    pseudo_signature
-        The pseudo signature data used to correct for unknown cell content. Defaults to None.
-    bias_factors
-        The bias factors used to correct for unknown cell content. Defaults to None.
 
     Returns
     -------
@@ -198,9 +191,6 @@ def direct_deconvolute(
 
     logger.info("direct deconvolute")
     fractions = weighted_dampened_deconvolute(signature, bulk)
-
-    if pseudo_signature is not None:
-        fractions = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, bias_factors)
 
     return fractions
 

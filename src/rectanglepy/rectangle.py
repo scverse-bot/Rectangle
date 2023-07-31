@@ -6,13 +6,19 @@ from .tl import recursive_deconvolute
 
 
 def rectangle(
-    sc_data: pd.DataFrame, annotations: pd.Series, bulks: pd.DataFrame, optimize_cutoffs: bool = True, p=0.02, lfc=1.0
+    sc_data: pd.DataFrame,
+    annotations: pd.Series,
+    bulks: pd.DataFrame,
+    *,
+    optimize_cutoffs: bool = True,
+    p=0.02,
+    lfc=1.0,
 ) -> pd.DataFrame:
     consistency_check(sc_data, annotations, bulks)
 
     bulks, sc_data = reduce_to_common_genes(bulks, sc_data)
 
-    signature_result = build_rectangle_signatures(sc_data, annotations, p, lfc, optimize_cutoffs)
+    signature_result = build_rectangle_signatures(sc_data, annotations, p=p, lfc=lfc, optimize_cutoffs=optimize_cutoffs)
 
     estimations = bulks.apply(lambda x: recursive_deconvolute(signature_result, x), axis=0)
 

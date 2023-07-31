@@ -100,7 +100,7 @@ def create_annotations_from_cluster_labels(labels, annotations, signature):
     return pd.Series(cluster_annotations, index=annotations.index)
 
 
-def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
+def filter_de_analysis_results(de_analysis_result, p, logfc):
     min_log2FC = logfc
     max_p = p
     de_analysis_result["log2_fc"] = de_analysis_result["log2FoldChange"]
@@ -151,8 +151,7 @@ def get_deseq2_genes_condition(pseudo_count_sig, sc_data, annotations, p, logfc,
 
 def get_marker_genes(annotations, deseq_results, logfc, p, sc_data):
     de_analysis_adjusted = {
-        annotation: filter_de_analysis_results(result, p, logfc, annotation)
-        for annotation, result in deseq_results.items()
+        annotation: filter_de_analysis_results(result, p, logfc) for annotation, result in deseq_results.items()
     }
     condition_number_matrices = create_condition_number_matrices(de_analysis_adjusted, sc_data, annotations)
     condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
@@ -169,7 +168,7 @@ def create_bias_factors(countsig):
 
 
 def build_rectangle_signatures(
-    sc_counts: pd.DataFrame, annotations: pd.Series, p, lfc, optimize_cutoffs: bool
+    sc_counts: pd.DataFrame, annotations: pd.Series, *, p=0.02, lfc=0.1, optimize_cutoffs=True
 ) -> RectangleSignatureResult:
     """Builds rectangle signatures based on single-cell count data and annotations.
 
