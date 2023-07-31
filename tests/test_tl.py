@@ -83,7 +83,7 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
 def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     sc_counts, annotations, bulk = small_data
     sc_counts = sc_counts.astype("int")
-    signature = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, 0.2, 1, False)
+    signature = rectangle.pp.build_rectangle_signatures(sc_counts, annotations, p=0.2, lfc=1, optimize_cutoffs=False)
     bulk, _, _ = quantiseq_data
     bulk = bulk.iloc[:, 11]
     pseudo_signature = signature.pseudobulk_sig_cpm
