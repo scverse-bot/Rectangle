@@ -57,25 +57,27 @@ def create_linkage_matrix(signature: pd.DataFrame):
     return linkage((np.log(signature + 1)).T, method=method, metric=metric)
 
 
-def sil_scores(X, Z, ts):
+def calculate_silhouette_scores(signature, linkage_matrix, cluster_range):
     scores = []
-    for num_clust in ts:
-        scores.append(silhouette_score(X, fcluster(Z, t=num_clust, criterion="maxclust")))
+    for num_clust in cluster_range:
+        scores.append(silhouette_score(signature, fcluster(linkage_matrix, t=num_clust, criterion="maxclust")))
     return scores
 
 
-def create_fclusters(signature, linkage_matrix) -> list[int]:
-    assert len(signature.columns) > 5
-    min_number_clusters = max(3, len(signature.columns) - 5)
-    max_number_clusters = len(signature.columns) - 1
-    scores = sil_scores((np.log(signature + 1)).T, linkage_matrix, range(min_number_clusters, max_number_clusters))
-    # take max score
+def create_fclusters(signature: pd.DataFrame, linkage_matrix) -> list[int]:
+    min_number_clusters = max(3, len(signature.columns) - 5)  # we don't want to cluster too many cell types together
+    max_number_clusters = len(signature.columns) - 1  # we want to have at least one cluster wih multiple cell types
+    cluster_range = range(min_number_clusters, max_number_clusters)
+
+    scores = calculate_silhouette_scores((np.log(signature + 1)).T, linkage_matrix, cluster_range)
     cluster_number = scores.index(max(scores)) + min_number_clusters
     clusters = fcluster(linkage_matrix, criterion="maxclust", t=cluster_number)
+
     if len(set(clusters)) == 1:
         # default clustering clustered all cell types in same cluster, fallback to distance metric
         distance = linkage_matrix[0][2]
         clusters = fcluster(linkage_matrix, criterion="distance", t=distance)
+
     return list(clusters)
 
 
@@ -178,12 +180,9 @@ def build_rectangle_signatures(
     annotations
         The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
     p
-    p
         The p-value threshold for the DE analysis.
     lfc
         The log fold change threshold for the DE analysis.
-    with_recursive_step
-        Indicates whether to include the recursive clustering step. Defaults to True.
     optimize_cutoffs
         Indicates whether to optimize the p-value and log fold change cutoffs using gridsearch. Defaults to True.
 
