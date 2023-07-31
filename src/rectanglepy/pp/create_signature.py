@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from loguru import logger
 from pydeseq2.dds import DeseqDataSet
 from pydeseq2.ds import DeseqStats
 from scipy.cluster.hierarchy import fcluster, linkage
@@ -112,7 +113,6 @@ def filter_de_analysis_results(de_analysis_result, p, logfc, annotation):
             (de_analysis_result["pvalue"] < max_p) & (de_analysis_result["log2_fc"] > min_log2FC)
         ]
 
-    print(f"Found {len(adjusted_result)} genes for {annotation}\n")
     return adjusted_result
 
 
@@ -120,6 +120,7 @@ def generate_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
     results = {}
     count_df = countsig[countsig.sum(axis=1) > 0].T
     for i, cell_type in enumerate(countsig.columns):
+        logger.info(f"Running DE analysis for {cell_type}")
         condition = np.zeros(len(countsig.columns))
         condition[i] = 1
         clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
@@ -134,9 +135,14 @@ def generate_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
 
 
 def get_deseq2_genes_condition(pseudo_count_sig, sc_data, annotations, p, logfc, optimize_cutoffs: bool):
+    logger.info("Starting DE analysis")
     deseq_results = generate_deseq2(pseudo_count_sig)
+    logger.info("Finished DE analysis")
+
     if optimize_cutoffs:
+        logger.info("Optimizing cutoff parameters p and lfc")
         p, logfc = optimize_parameters(sc_data, annotations, pseudo_count_sig, deseq_results)
+        logger.info(f"Optimization done\n Best cutoffs  p: {p} and lfc: {logfc}")
     markers = get_marker_genes(annotations, deseq_results, logfc, p, sc_data)
     return pd.Series(markers)
 
@@ -190,39 +196,41 @@ def build_rectangle_signatures(
     pseudo_signature_counts = sc_counts.groupby(annotations.values, axis=1).sum()
 
     if any(pd.api.types.is_sparse(dtype) for dtype in pseudo_signature_counts.dtypes):
-        # pseudo signature can be dense, this is also more straightforward for the R conversion
+        # pseudo signature can be dense, this speeds up the analysis
         pseudo_signature_counts = pseudo_signature_counts.sparse.to_dense()
 
-    print("creating signature")
+    logger.info("Starting rectangle signature analysis")
     biasfact = create_bias_factors(pseudo_signature_counts)
     genes = get_deseq2_genes_condition(pseudo_signature_counts, sc_counts, annotations, p, lfc, optimize_cutoffs)
     pseudo_signature_counts = convert_to_cpm(pseudo_signature_counts)
 
     if len(pseudo_signature_counts.columns) < 4:
+        logger.info("Not enough cell types to perform clustering, returning direct rectangle signature")
         return RectangleSignatureResult(
             signature_genes=genes, pseudobulk_sig_cpm=pseudo_signature_counts, bias_factors=biasfact
         )
 
-    print("creating clustered signature")
     linkage_matrix = create_linkage_matrix(pseudo_signature_counts.loc[genes])
     clusters = create_fclusters(pseudo_signature_counts.loc[genes], linkage_matrix)
-    assignments, clustered_signature, clustered_biasfact, clustered_genes = None, None, None, None
-    if len(set(clusters)) > 2:
-        assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
-        clustered_annotations = create_annotations_from_cluster_labels(
-            assignments, annotations, pseudo_signature_counts
+
+    if len(set(clusters)) <= 2:
+        logger.info("Not enough clusters to perform clustered signature analysis, returning direct rectangle signature")
+        return RectangleSignatureResult(
+            signature_genes=genes, pseudobulk_sig_cpm=pseudo_signature_counts, bias_factors=biasfact
         )
 
-        clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
-        if any(pd.api.types.is_sparse(dtype) for dtype in clustered_signature.dtypes):
-            # pseudo signature can be dense, this is also more straightforward for the R conversion
-            clustered_signature = clustered_signature.sparse.to_dense()
+    logger.info("Starting clustered analysis")
+    assignments = get_fcluster_assignments(clusters, pseudo_signature_counts.columns)
+    clustered_annotations = create_annotations_from_cluster_labels(assignments, annotations, pseudo_signature_counts)
+    clustered_signature = sc_counts.groupby(clustered_annotations.values, axis=1).sum()
 
-        clustered_biasfact = create_bias_factors(clustered_signature)
-        clustered_genes = get_deseq2_genes_condition(
-            clustered_signature, sc_counts, clustered_annotations, p, lfc, False
-        )
-        clustered_signature = convert_to_cpm(clustered_signature)
+    if any(pd.api.types.is_sparse(dtype) for dtype in clustered_signature.dtypes):
+        # pseudo signature can be dense, this speeds up some calculations
+        clustered_signature = clustered_signature.sparse.to_dense()
+
+    clustered_biasfact = create_bias_factors(clustered_signature)
+    clustered_genes = get_deseq2_genes_condition(clustered_signature, sc_counts, clustered_annotations, p, lfc, False)
+    clustered_signature = convert_to_cpm(clustered_signature)
 
     return RectangleSignatureResult(
         signature_genes=genes,
@@ -244,9 +252,8 @@ def optimize_parameters(
     results = []
     for p in ps:
         for lfc in lfcs:
-            print("Computing RMSE and correlation for p:", p, "and lfc:", lfc, "...")
             rmse, pearson_r = assess_parameter_fit(lfc, p, sc_data, annotations, pseudo_signature_counts, de_results)
-            print("RMSE:", rmse, "Pearson R:", pearson_r)
+            logger.info(f"RMSE:{rmse}, Pearson R:{pearson_r} for p={p}, lfc={lfc}")
             results.append({"p": p, "lfc": lfc, "rmse": rmse, "pearson_r": pearson_r})
 
     results_df = pd.DataFrame(results)
@@ -255,7 +262,6 @@ def optimize_parameters(
     best_p = results_df[results_df["pearson_r"] == best_r]["p"].values[0]
     best_lfc = results_df[results_df["pearson_r"] == best_r]["lfc"].values[0]
 
-    print("Best Pearson R was:", best_r, "with p:", best_p, "and lfc:", best_lfc)
     return best_p, best_lfc
 
 
@@ -306,20 +312,16 @@ def generate_pseudo_bulks(sc_data, annotations):
     return bulks, pd.DataFrame(real_fractions).T
 
 
-def generate_signature(sc_data, annotations, de_results, pseudobulk_sig, logfc, p):
-    marker_genes = pd.Series(get_marker_genes(annotations, de_results, logfc, p, sc_data))
-    signature = (pseudobulk_sig * 1e6 / np.sum(pseudobulk_sig)).loc[marker_genes]
-    return signature
-
-
 def generate_estimated_fractions(pseudo_bulk_sig, bulks, p, logfc, de_results, sc_data, annotations):
     bias_factors = create_bias_factors(pseudo_bulk_sig)
 
-    signature = generate_signature(sc_data, annotations, de_results, pseudo_bulk_sig, logfc, p) * bias_factors
+    marker_genes = pd.Series(get_marker_genes(annotations, de_results, logfc, p, sc_data))
+    signature = (pseudo_bulk_sig * 1e6 / np.sum(pseudo_bulk_sig)).loc[marker_genes]
     pseudo_sig_cpm = pseudo_bulk_sig * 1e6 / np.sum(pseudo_bulk_sig)
 
     estimated_fractions = bulks.apply(lambda x: solve_quadratic_programming(signature, x), axis=0)
     estimated_fractions.index = signature.columns
+
     estimated_fractions_corrected = []
     for i in range(len(estimated_fractions.columns)):
         estimated_fractions_corrected.append(

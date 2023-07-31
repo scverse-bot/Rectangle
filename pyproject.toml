@@ -25,7 +25,8 @@ dependencies = [
     "session-info",
     "statsmodels",
     "quadprog",
-    "pydeseq2"
+    "pydeseq2",
+    "loguru",
 ]
 
 [project.optional-dependencies]

@@ -1,4 +1,5 @@
 import pandas as pd
+from loguru import logger
 
 from .pp import build_rectangle_signatures
 from .tl import recursive_deconvolute
@@ -28,6 +29,7 @@ def consistency_check(sc_data: pd.DataFrame, annotations: pd.Series, bulks: pd.D
 
 def reduce_to_common_genes(bulks: pd.DataFrame, sc_data: pd.DataFrame):
     genes = list(set(bulks.index) & set(sc_data.index))
+    logger.info(f"Reducing bulks and sc data to {len(genes)} common genes")
     sc_data = sc_data.loc[genes].sort_index()
     bulks = bulks.loc[genes].sort_index()
     return bulks, sc_data

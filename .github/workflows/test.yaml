@@ -63,4 +63,4 @@ jobs:
                   PLATFORM: ${{ matrix.os }}
                   DISPLAY: :42
               run: |
-                  pytest -v --cov --color=yes
+                  pytest -v --color=yes
