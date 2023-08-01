@@ -125,7 +125,7 @@ def generate_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
         condition = np.zeros(len(countsig.columns))
         condition[i] = 1
         clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
-        dds = DeseqDataSet(counts=count_df, clinical=clinical_df, design_factors="condition")
+        dds = DeseqDataSet(counts=count_df, metadata=clinical_df, design_factors="condition", quiet=True)
         dds.deseq2()
         stat_res = DeseqStats(dds)
         stat_res.summary()

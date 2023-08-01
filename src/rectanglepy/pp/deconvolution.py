@@ -140,7 +140,7 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
 
     signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
     start_fractions = weighted_dampened_deconvolute(signature, bulk)
-
+    logger.info("Correct for unknown cell content")
     start_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
     )
@@ -155,7 +155,7 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
     )
     clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
     recursive_fractions = weighted_dampened_deconvolute(signature, bulk, signatures.assignments, clustered_fractions)
-
+    logger.info("Correct for unknown cell content")
     recursive_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
     )
@@ -196,8 +196,6 @@ def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series) -> pd.Series:
 
 
 def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates, bias_factors):
-    logger.info("Correct for unknown cell content")
-
     if estimates.sum() == 0:
         estimates_fix = estimates
         # analysis fails if all cell fractions are zero, so we set the unknown cell content to ß
@@ -218,7 +216,6 @@ def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates, bias_fac
     # bulk RNA-seq data, divided by the overall expression in the true bulk
     ukn_cc = (bulk - bulk_est).sum() / (bulk.sum())
     ukn_cc = max(0, ukn_cc)
-    logger.info(f"Unknown cell content: {ukn_cc}")
     # Correct (i.e. scale) the cell fraction estimates so that their sum
     # equals 1 - the unknown cellular content estimated above
     estimates_fix = estimates / estimates.sum() * (1 - ukn_cc)
