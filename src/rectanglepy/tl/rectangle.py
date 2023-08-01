@@ -1,8 +1,7 @@
 import pandas as pd
 from loguru import logger
 
-from .pp import build_rectangle_signatures
-from .tl import recursive_deconvolute
+from rectanglepy.pp import build_rectangle_signatures, recursive_deconvolute
 
 
 def rectangle(

@@ -6,7 +6,7 @@ import quadprog
 import statsmodels.api as sm
 from loguru import logger
 
-from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
+from .rectangle_signature import RectangleSignatureResult
 
 
 def scale_weights(weights):
@@ -95,7 +95,7 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     dampening_constant = find_dampening_constant(signature, bulk, approximate_solution)
     multiplier = 2**dampening_constant
 
-    max_iterations = 1000
+    max_iterations = 1200
     convergence_threshold = 0.01
     change = 1
     iterations = 0

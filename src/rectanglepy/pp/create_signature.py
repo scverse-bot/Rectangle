@@ -7,8 +7,7 @@ from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.stats import pearsonr
 from sklearn.metrics import silhouette_score
 
-from rectanglepy.tl import correct_for_unknown_cell_content, solve_dampened_wsl
-
+from .deconvolution import correct_for_unknown_cell_content, solve_dampened_wsl
 from .rectangle_signature import RectangleSignatureResult
 
 
