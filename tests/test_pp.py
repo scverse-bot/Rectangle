@@ -50,18 +50,6 @@ def quantiseq_data(data_dir):
     return bulk, fractions, signature
 
 
-@pytest.fixture
-def finotello_bulk(data_dir):
-    bulk = pd.read_csv(data_dir / "finotello_bulk.csv", index_col=0, header=0)
-    return bulk
-
-
-@pytest.fixture
-def dream_bulk(data_dir):
-    bulk = pd.read_csv(data_dir / "dream.csv", index_col=0, header=0)
-    return bulk
-
-
 def test_create_linkage_matrix(hao_signature):
     linkage_matrix = create_linkage_matrix(hao_signature)
     assert len(linkage_matrix) == 10

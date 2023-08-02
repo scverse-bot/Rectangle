@@ -41,12 +41,6 @@ def finotello_bulk(data_dir):
     return bulk
 
 
-@pytest.fixture
-def dream_bulk(data_dir):
-    bulk = pd.read_csv(data_dir / "dream.csv", index_col=0, header=0)
-    return bulk
-
-
 def test_generate_pseudo_bulks(small_data):
     sc_data, annotations, bulk = small_data
     bulks, real_fractions = generate_pseudo_bulks(sc_data, annotations)
