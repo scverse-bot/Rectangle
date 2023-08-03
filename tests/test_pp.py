@@ -6,18 +6,17 @@ import pytest
 
 import rectanglepy as rectangle
 from rectanglepy.pp.create_signature import (
+    _create_annotations_from_cluster_labels,
+    _create_fclusters,
+    _create_linkage_matrix,
+    _get_fcluster_assignments,
     build_rectangle_signatures,
-    convert_to_cpm,
-    create_annotations_from_cluster_labels,
-    create_fclusters,
-    create_linkage_matrix,
-    get_fcluster_assignments,
 )
 from rectanglepy.pp.deconvolution import (
+    _scale_weights,
+    calculate_dwls,
     correct_for_unknown_cell_content,
-    scale_weights,
-    solve_dampened_wsl,
-    weighted_dampened_deconvolute,
+    solve_qp,
 )
 
 
@@ -51,20 +50,20 @@ def quantiseq_data(data_dir):
 
 
 def test_create_linkage_matrix(hao_signature):
-    linkage_matrix = create_linkage_matrix(hao_signature)
+    linkage_matrix = _create_linkage_matrix(hao_signature)
     assert len(linkage_matrix) == 10
 
 
 def test_create_fclusters(hao_signature):
-    linkage_matrix = create_linkage_matrix(hao_signature)
-    clusters = rectangle.pp.create_signature.create_fclusters(hao_signature, linkage_matrix)
+    linkage_matrix = _create_linkage_matrix(hao_signature)
+    clusters = rectangle.pp.create_signature._create_fclusters(hao_signature, linkage_matrix)
     assert clusters == [2, 3, 3, 4, 1, 5, 3, 1, 2, 6, 3]
 
 
 def test_get_fcluster_assignments(hao_signature):
-    linkage_matrix = create_linkage_matrix(hao_signature)
-    clusters = create_fclusters(hao_signature, linkage_matrix)
-    assignments = get_fcluster_assignments(clusters, hao_signature.columns)
+    linkage_matrix = _create_linkage_matrix(hao_signature)
+    clusters = _create_fclusters(hao_signature, linkage_matrix)
+    assignments = _get_fcluster_assignments(clusters, hao_signature.columns)
     assert assignments == [2, 3, 3, "NK cells", 1, "pDC", 3, 1, 2, "Platelet", 3]
 
 
@@ -84,23 +83,17 @@ def test_create_annotations_from_cluster_labels(hao_signature):
             "Monocytes",
         ]
     )
-    linkage_matrix = create_linkage_matrix(hao_signature)
-    clusters = create_fclusters(hao_signature, linkage_matrix)
-    assignments = get_fcluster_assignments(clusters, hao_signature.columns)
-    annotations_from_cluster = create_annotations_from_cluster_labels(assignments, annotations, hao_signature)
+    linkage_matrix = _create_linkage_matrix(hao_signature)
+    clusters = _create_fclusters(hao_signature, linkage_matrix)
+    assignments = _get_fcluster_assignments(clusters, hao_signature.columns)
+    annotations_from_cluster = _create_annotations_from_cluster_labels(assignments, annotations, hao_signature)
 
     assert list(annotations_from_cluster) == ["NK cells", "pDC", "1", "3", "3", "Platelet", "1", "2", "3", "3", "2"]
 
 
-def test_convert_to_cpm(small_data):
-    count_sc_data = small_data[0]
-    cpm_sc_data = convert_to_cpm(count_sc_data)
-    assert np.isclose(cpm_sc_data.iloc[1, 0], 179.69972)
-
-
 def test_scale_weigths():
     weights = [1, 0]
-    result = scale_weights(weights)
+    result = _scale_weights(weights)
     assert (result == [np.Inf, 0]).all()
 
 
@@ -114,7 +107,7 @@ def test_solve_dampened_wsl(quantiseq_data):
     signature = signature.loc[genes].sort_index()
     bulk = bulk.loc[genes].sort_index().astype("double")
 
-    result = solve_dampened_wsl(signature, bulk)
+    result = solve_qp(signature, bulk)
     # evaluation metrics
     corr = np.corrcoef(result, expected)[0, 1]
     rsme = np.sqrt(np.mean((result - expected) ** 2))
@@ -128,12 +121,20 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
     bulk = bulk.iloc[:, j]
     expected = real_fractions.T.iloc[:, j]
 
-    result = weighted_dampened_deconvolute(signature, bulk)
+    result = calculate_dwls(signature, bulk)
     # evaluation metrics
     corr = np.corrcoef(result, expected)[0, 1]
     rsme = np.sqrt(np.mean((result - expected) ** 2))
 
     assert corr > 0.92 and rsme < 0.015
+
+
+def test_build_rectangle_signatures(small_data):
+    sc_counts, annotations, bulk = small_data
+    sc_counts = sc_counts.astype("int")
+    results = build_rectangle_signatures(sc_counts, annotations, p=0.2, lfc=1, optimize_cutoffs=False)
+    assert results.assignments is None  # should not cluster
+    assert len(results.signature_genes) > 0
 
 
 def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
@@ -144,7 +145,7 @@ def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     bulk = bulk.iloc[:, 11]
     pseudo_signature = signature.pseudobulk_sig_cpm
     sig = pseudo_signature.loc[signature.signature_genes]
-    fractions = weighted_dampened_deconvolute(sig, bulk)
+    fractions = calculate_dwls(sig, bulk)
     biasfact = (pseudo_signature > 0).sum(axis=0)
     biasfact = biasfact / biasfact.min()
     result = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, biasfact)

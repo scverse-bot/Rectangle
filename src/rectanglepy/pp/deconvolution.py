@@ -9,12 +9,34 @@ from loguru import logger
 from .rectangle_signature import RectangleSignatureResult
 
 
-def scale_weights(weights):
+def _scale_weights(weights):
     min_weight = np.nextafter(min(weights), np.float64(1.0))  # prevent division by zero
     return weights / min_weight
 
 
-def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None, gld=None, multiplier=None):
+def solve_qp(signature, bulk, prev_assignments=None, prev_weights=None, gld=None, multiplier=None):
+    """Performs quadratic programming optimization.
+
+    Parameters
+    ----------
+    signature
+        The signature data for deconvolution.
+    bulk
+        The bulk data for deconvolution.
+    multiplier
+        todo
+    prev_weights
+        todo
+    prev_assignments
+        todo
+    gld
+        todo
+
+
+    Returns
+    -------
+    pd.Series: The corrected cell fractions.
+    """
     # ------------------ QP-based deconvolution
     # Minimize     1/2 x^T G x - a^T x
     # Subject to   C.T x >= b
@@ -23,7 +45,7 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
         G = np.dot(signature.T, signature).astype("double")
     else:
         weights = np.square(1 / (signature @ gld))
-        weights_dampened = np.clip(scale_weights(weights), None, multiplier)
+        weights_dampened = np.clip(_scale_weights(weights), None, multiplier)
         W = np.diag(weights_dampened)
         G = np.dot(signature.T, np.dot(W, signature))
         a = np.dot(signature.T, np.dot(W, bulk))
@@ -57,11 +79,11 @@ def solve_dampened_wsl(signature, bulk, prev_assignments=None, prev_weights=None
     return solution[0]
 
 
-def find_dampening_constant(signature, bulk, qp_gld):
+def _find_dampening_constant(signature, bulk, qp_gld):
     solutions_std = []
     np.random.seed(1)
     weights = np.square(1 / (np.dot(signature, qp_gld)))
-    weights_scaled = scale_weights(weights)
+    weights_scaled = _scale_weights(weights)
     weights_scaled_no_inf = weights_scaled[weights_scaled != np.inf]
     qp_gld_sum = sum(qp_gld)
     # try multiple values of the dampening constant (multiplier)
@@ -86,13 +108,14 @@ def find_dampening_constant(signature, bulk, qp_gld):
     return best_dampening_constant
 
 
-def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_weights=None):
+def calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
+    """Calculate the deconvolution using dampened weighted least squares."""
     genes = list(set(signature.index) & set(bulk.index))
     signature = signature.loc[genes].sort_index()
     bulk = bulk.loc[genes].sort_index().astype("double")
 
-    approximate_solution = solve_dampened_wsl(signature, bulk, prev_assignments, prev_weights)
-    dampening_constant = find_dampening_constant(signature, bulk, approximate_solution)
+    approximate_solution = solve_qp(signature, bulk, prev_assignments, prev_weights)
+    dampening_constant = _find_dampening_constant(signature, bulk, approximate_solution)
     multiplier = 2**dampening_constant
 
     max_iterations = 1200
@@ -100,9 +123,7 @@ def weighted_dampened_deconvolute(signature, bulk, prev_assignments=None, prev_w
     change = 1
     iterations = 0
     while (change > convergence_threshold) and (iterations < max_iterations):
-        dampened_solution = solve_dampened_wsl(
-            signature, bulk, prev_assignments, prev_weights, approximate_solution, multiplier
-        )
+        dampened_solution = solve_qp(signature, bulk, prev_assignments, prev_weights, approximate_solution, multiplier)
         solution_averages = (dampened_solution + approximate_solution * 4) / 5
         change = np.linalg.norm(solution_averages - approximate_solution, 1)
         approximate_solution = solution_averages
@@ -139,7 +160,7 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
 
     signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
-    start_fractions = weighted_dampened_deconvolute(signature, bulk)
+    start_fractions = calculate_dwls(signature, bulk)
     logger.info("Correct for unknown cell content")
     start_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
@@ -153,8 +174,8 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
     clustered_signature = (
         clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * signatures.clustered_bias_factors
     )
-    clustered_fractions = weighted_dampened_deconvolute(clustered_signature, bulk)
-    recursive_fractions = weighted_dampened_deconvolute(signature, bulk, signatures.assignments, clustered_fractions)
+    clustered_fractions = calculate_dwls(clustered_signature, bulk)
+    recursive_fractions = calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
     logger.info("Correct for unknown cell content")
     recursive_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
@@ -190,12 +211,31 @@ def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series) -> pd.Series:
     assert (signature is not None) and (bulk is not None)
 
     logger.info("direct deconvolute")
-    fractions = weighted_dampened_deconvolute(signature, bulk)
+    fractions = calculate_dwls(signature, bulk)
 
     return fractions
 
 
-def correct_for_unknown_cell_content(bulk, pseudo_signature, estimates, bias_factors):
+def correct_for_unknown_cell_content(
+    bulk: pd.Series, pseudo_signature: pd.DataFrame, estimates: pd.Series, bias_factors: pd.Series
+) -> pd.Series:
+    """Performs direct deconvolution using a signature and bulk data.
+
+    Parameters
+    ----------
+    bulk
+        The bulk data for deconvolution.
+    pseudo_signature
+        The signature data for deconvolution.
+    estimates
+        The estimated cell fractions resulting from deconvolution.
+    bias_factors
+        The bias factors used for deconvolution.
+
+    Returns
+    -------
+    pd.Series: The corrected cell fractions.
+    """
     if estimates.sum() == 0:
         estimates_fix = estimates
         # analysis fails if all cell fractions are zero, so we set the unknown cell content to ß
