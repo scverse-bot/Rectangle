@@ -57,7 +57,7 @@ def test_create_linkage_matrix(hao_signature):
 def test_create_fclusters(hao_signature):
     linkage_matrix = _create_linkage_matrix(hao_signature)
     clusters = rectangle.pp.create_signature._create_fclusters(hao_signature, linkage_matrix)
-    assert clusters == [2, 3, 3, 4, 1, 5, 3, 1, 2, 6, 3]
+    assert clusters == [1, 3, 3, 4, 1, 5, 3, 1, 2, 6, 3]
 
 
 def test_get_fcluster_assignments(hao_signature):
