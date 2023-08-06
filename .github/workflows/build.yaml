@@ -5,6 +5,11 @@ on:
         branches: [main]
     pull_request:
         branches: [main]
+    workflow_run:
+        workflows:
+            - "Test"
+        types:
+            - completed
 
 jobs:
     package:
