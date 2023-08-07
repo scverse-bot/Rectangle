@@ -1,7 +1,7 @@
 import pandas as pd
 from loguru import logger
 
-from rectanglepy.pp import build_rectangle_signatures, recursive_deconvolute
+from rectanglepy.pp import build_rectangle_signatures, deconvolute
 
 
 def rectangle(
@@ -39,7 +39,7 @@ def rectangle(
 
     signature_result = build_rectangle_signatures(sc_data, annotations, p=p, lfc=lfc, optimize_cutoffs=optimize_cutoffs)
 
-    estimations = bulks.apply(lambda x: recursive_deconvolute(signature_result, x), axis=0)
+    estimations = bulks.apply(lambda x: deconvolute(signature_result, x), axis=0)
 
     return estimations
 

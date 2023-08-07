@@ -13,8 +13,8 @@ from rectanglepy.pp.create_signature import (
     build_rectangle_signatures,
 )
 from rectanglepy.pp.deconvolution import (
+    _calculate_dwls,
     _scale_weights,
-    calculate_dwls,
     correct_for_unknown_cell_content,
     solve_qp,
 )
@@ -121,7 +121,7 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
     bulk = bulk.iloc[:, j]
     expected = real_fractions.T.iloc[:, j]
 
-    result = calculate_dwls(signature, bulk)
+    result = _calculate_dwls(signature, bulk)
     # evaluation metrics
     corr = np.corrcoef(result, expected)[0, 1]
     rsme = np.sqrt(np.mean((result - expected) ** 2))
@@ -145,7 +145,7 @@ def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     bulk = bulk.iloc[:, 11]
     pseudo_signature = signature.pseudobulk_sig_cpm
     sig = pseudo_signature.loc[signature.signature_genes]
-    fractions = calculate_dwls(sig, bulk)
+    fractions = _calculate_dwls(sig, bulk)
     biasfact = (pseudo_signature > 0).sum(axis=0)
     biasfact = biasfact / biasfact.min()
     result = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, biasfact)

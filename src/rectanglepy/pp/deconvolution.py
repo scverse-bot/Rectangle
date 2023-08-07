@@ -108,7 +108,7 @@ def _find_dampening_constant(signature, bulk, qp_gld):
     return best_dampening_constant
 
 
-def calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
+def _calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
     """Calculate the deconvolution using dampened weighted least squares."""
     genes = list(set(signature.index) & set(bulk.index))
     signature = signature.loc[genes].sort_index()
@@ -132,7 +132,7 @@ def calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
     return pd.Series(approximate_solution, index=signature.columns)
 
 
-def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Series:
+def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Series:
     """Performs recursive deconvolution using rectangle signatures and bulk data.
 
     Parameters
@@ -160,7 +160,7 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
 
     signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
-    start_fractions = calculate_dwls(signature, bulk)
+    start_fractions = _calculate_dwls(signature, bulk)
     logger.info("Correct for unknown cell content")
     start_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
@@ -174,8 +174,8 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
     clustered_signature = (
         clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * signatures.clustered_bias_factors
     )
-    clustered_fractions = calculate_dwls(clustered_signature, bulk)
-    recursive_fractions = calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
+    clustered_fractions = _calculate_dwls(clustered_signature, bulk)
+    recursive_fractions = _calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
     logger.info("Correct for unknown cell content")
     recursive_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
@@ -186,55 +186,40 @@ def recursive_deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series)
     return final_fractions
 
 
-def direct_deconvolute(signature: pd.DataFrame, bulk: pd.Series) -> pd.Series:
-    """Performs direct deconvolution using a signature and bulk data.
-
-    Parameters
-    ----------
-    signature
-        The signature data for deconvolution.
-    bulk
-        The bulk data for deconvolution.
-
-    Returns
-    -------
-    pd.Series: The estimated cell fractions resulting from deconvolution.
-
-    Notes
-    -----
-        - The `signature` parameter should be a pandas DataFrame representing the signature data for deconvolution.
-        - The `bulk` parameter should be a pandas Series representing the bulk data for deconvolution.
-        - The function performs weighted dampened deconvolution using the provided signature and bulk data.
-        - If a `pseudo_signature` is provided, the estimated cell fractions are corrected for unknown cell content using the pseudo signature and the bulk data.
-        - The resulting estimated cell fractions are returned as a pandas Series.
-    """
-    assert (signature is not None) and (bulk is not None)
-
-    logger.info("direct deconvolute")
-    fractions = calculate_dwls(signature, bulk)
-
-    return fractions
-
-
 def correct_for_unknown_cell_content(
-    bulk: pd.Series, pseudo_signature: pd.DataFrame, estimates: pd.Series, bias_factors: pd.Series
+    bulk: pd.Series, pseudo_signature_cpm: pd.DataFrame, estimates: pd.Series, bias_factors: pd.Series
 ) -> pd.Series:
-    """Performs direct deconvolution using a signature and bulk data.
+    r"""Performs correction for unknown cell content using the pseudo signature and bulk data.
+
+    Reconstructs the bulk expression profiles through  the estimated cell fractions (weighted by the mRNA bias factors) and cell-type-specific expression profiles (i.e. signature).
+
+    .. math::
+        \text{bulk_est} = \text{pseudo_signature} \times (\text{estimates}^T \times \text{bias_factors})
+
+    The unknown cellular content is then calculated as the difference of per-sample overall expression levels in the true vs. reconstructed bulk, divided by the overall expression in the true bulk.
+
+    .. math::
+         \text{ukn_cc} = \frac{\text{bulk} - \text{bulk_est}}{\sum_{i=1}^{n} x_i}
+
+    Finally, the methods corrects (i.e. scales) the cell fraction estimates so that their sum equals 1 - the unknown cellular content and returns this corrected value to the user.
+
+    .. math::
+        \text{estimates_fix} = \frac{\text{estimates}}{\sum_{i=1}^{n} x_i} \times (1 - \text{ukn_cc})
 
     Parameters
     ----------
     bulk
-        The bulk data for deconvolution.
-    pseudo_signature
-        The signature data for deconvolution.
+        The bulk count data for deconvolution, indexed by gene. Normalized by TPM.
+    pseudo_signature_cpm
+        Averaged sc data, indexed by gene. Normalized by CPM. Contains all genes.
     estimates
-        The estimated cell fractions resulting from deconvolution.
+        The estimated cell fractions resulting from the deconvolution. Indexed by cell type.
     bias_factors
-        The bias factors used for deconvolution.
+        The mRNA bias factors of the sc data atlas.
 
     Returns
     -------
-    pd.Series: The corrected cell fractions.
+    pd.Series: The corrected cell fractions, indexed by cell type. Adds an "Unknown" cell type.
     """
     if estimates.sum() == 0:
         estimates_fix = estimates
@@ -242,7 +227,7 @@ def correct_for_unknown_cell_content(
         estimates_fix.loc["Unknown"] = 0
         return estimates_fix
 
-    signature = pseudo_signature.sort_index()
+    signature = pseudo_signature_cpm.sort_index()
     bulk = bulk.sort_index()
 
     # Reconstruct the bulk expression profiles through matrix multiplication

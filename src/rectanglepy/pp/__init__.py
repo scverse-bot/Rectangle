@@ -1,7 +1,5 @@
-from .create_signature import (
-    build_rectangle_signatures,
-)
-from .deconvolution import direct_deconvolute, recursive_deconvolute
+from .create_signature import build_rectangle_signatures, correct_for_unknown_cell_content
+from .deconvolution import deconvolute
 from .rectangle_signature import RectangleSignatureResult
 
-__all__ = ["build_rectangle_signatures", "recursive_deconvolute", "direct_deconvolute", "RectangleSignatureResult"]
+__all__ = ["build_rectangle_signatures", "correct_for_unknown_cell_content", "deconvolute", "RectangleSignatureResult"]

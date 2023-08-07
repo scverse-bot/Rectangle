@@ -10,6 +10,7 @@
     :toctree: generated
 
     pp.build_rectangle_signatures
+    pp.correct_for_unknown_cell_content
     pp.RectangleSignatureResult
 ```
 
@@ -22,6 +23,5 @@
 .. autosummary::
     :toctree: generated
 
-    tl.direct_deconvolute
-    tl.recursive_deconvolute
+    tl.rectangle
 ```

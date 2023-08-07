@@ -194,26 +194,30 @@ def _create_clustered_data(
 
 
 def build_rectangle_signatures(
-    sc_counts: pd.DataFrame, annotations: pd.Series, *, p=0.02, lfc=0.1, optimize_cutoffs=True
+    sc_counts: pd.DataFrame, annotations: pd.Series, *, optimize_cutoffs=True, p=0.02, lfc=0.1
 ) -> RectangleSignatureResult:
-    """Builds rectangle signatures based on single-cell count data and annotations.
+    r"""Builds rectangle signatures based on single-cell  count data and annotations.
+
+    .. math::
+
+        x = \frac{{-b + \sqrt{{b^2 - 4ac}}}}{{2a}}
 
     Parameters
     ----------
     sc_counts
-        The single-cell count data as a DataFrame. DataFrame should have the genes as rows and cell as columns.
+        The single-cell count data as a DataFrame. DataFrame must have the genes as index and cell identifier as columns. Each entry should be in raw counts.
     annotations
-        The annotations corresponding to the single-cell count data. Series should have the corresponding annotations for each cell.
-    p
-        The p-value threshold for the DE analysis.
-    lfc
-        The log fold change threshold for the DE analysis.
+        The annotations corresponding to the single-cell count data. Series data should have the cell identifier as index and the annotations as values.
     optimize_cutoffs
         Indicates whether to optimize the p-value and log fold change cutoffs using gridsearch. Defaults to True.
+    p
+        The p-value threshold for the DE analysis (only used if optimize_cutoffs is False).
+    lfc
+        The log fold change threshold for the DE analysis (only used if optimize_cutoffs is False).
 
     Returns
     -------
-    The result of the rectangle signature analysis.
+    The result of the rectangle signature analysis which is of type RectangleSignatureResult.
     """
     assert sc_counts is not None and annotations is not None
 
