@@ -18,7 +18,6 @@ def _convert_to_cpm(count_sc_data):
 def _create_condition_number_matrix(
     de_adjusted, sc_data: pd.DataFrame, max_gene_number: int, annotations
 ) -> pd.DataFrame:
-    # Use a set to automatically handle duplicates
     genes = set()
     for annotation in de_adjusted:
         genes.update(_find_signature_genes(max_gene_number, de_adjusted[annotation]))
@@ -198,10 +197,6 @@ def build_rectangle_signatures(
 ) -> RectangleSignatureResult:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
 
-    .. math::
-
-        x = \frac{{-b + \sqrt{{b^2 - 4ac}}}}{{2a}}
-
     Parameters
     ----------
     sc_counts
@@ -299,8 +294,7 @@ def _generate_pseudo_bulks(sc_data, annotations):
     split_size = 60
     bulks = []
     real_fractions = []
-    # set seed
-    np.random.seed(1)
+    np.random.seed(42)
     for _ in range(number_of_bulks):
         indices = []
         cell_numbers = []

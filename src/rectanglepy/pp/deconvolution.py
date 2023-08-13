@@ -92,7 +92,7 @@ def _find_dampening_constant(signature, bulk, qp_gld):
         solutions = []
         multiplier = 2**i
         weights_dampened = np.array([multiplier if multiplier <= x else x for x in weights_scaled]).astype("double")
-        for _ in range(86):
+        for _ in range(80):
             subset = np.random.choice(len(signature), size=len(signature) // 2, replace=False)
             bulk_subset = bulk.iloc[list(subset)]
             signature_subset = signature.iloc[subset, :]
@@ -118,7 +118,7 @@ def _calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
     dampening_constant = _find_dampening_constant(signature, bulk, approximate_solution)
     multiplier = 2**dampening_constant
 
-    max_iterations = 1200
+    max_iterations = 1000
     convergence_threshold = 0.01
     change = 1
     iterations = 0
@@ -176,6 +176,7 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Ser
     )
     clustered_fractions = _calculate_dwls(clustered_signature, bulk)
     recursive_fractions = _calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
+
     logger.info("Correct for unknown cell content")
     recursive_fractions = correct_for_unknown_cell_content(
         bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
