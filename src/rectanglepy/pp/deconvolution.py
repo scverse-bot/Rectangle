@@ -92,7 +92,7 @@ def _find_dampening_constant(signature, bulk, qp_gld):
         solutions = []
         multiplier = 2**i
         weights_dampened = np.array([multiplier if multiplier <= x else x for x in weights_scaled]).astype("double")
-        for _ in range(80):
+        for _ in range(86):
             subset = np.random.choice(len(signature), size=len(signature) // 2, replace=False)
             bulk_subset = bulk.iloc[list(subset)]
             signature_subset = signature.iloc[subset, :]
@@ -119,12 +119,14 @@ def _calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
     multiplier = 2**dampening_constant
 
     max_iterations = 1000
-    convergence_threshold = 0.01
+    convergence_threshold = 0.002
     change = 1
-    iterations = 0
+    iterations = 2
+    solutions_sum = approximate_solution
     while (change > convergence_threshold) and (iterations < max_iterations):
         dampened_solution = solve_qp(signature, bulk, prev_assignments, prev_weights, approximate_solution, multiplier)
-        solution_averages = (dampened_solution + approximate_solution * 4) / 5
+        solutions_sum += dampened_solution
+        solution_averages = solutions_sum / iterations
         change = np.linalg.norm(solution_averages - approximate_solution, 1)
         approximate_solution = solution_averages
         iterations += 1
@@ -182,7 +184,19 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Ser
         bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
     )
 
-    final_fractions = pd.concat([start_fractions, recursive_fractions]).groupby(level=0).mean()
+    final_fractions = []
+    for cell_type in list(start_fractions.index):
+        if cell_type in signatures.low_gene_cell_type:
+            final_fractions.append(recursive_fractions[cell_type])
+        else:
+            final_fractions.append((start_fractions[cell_type] * 2 + recursive_fractions[cell_type]) / 3)
+
+    final_fractions = pd.Series(final_fractions, index=start_fractions.index)
+    if final_fractions.sum() > 1:
+        final_fractions = final_fractions / final_fractions.sum()
+    else:
+        final_fractions["Unknown"] = final_fractions["Unknown"] + (1 - final_fractions.sum())
+
     logger.info("Deconvolution complete")
     return final_fractions
 

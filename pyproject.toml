@@ -21,8 +21,6 @@ urls.Home-page = "https://github.com/bernheder/Rectangle"
 dependencies = [
     "scikit-learn",
     "anndata",
-    # for debug logging (referenced from the issue template)
-    "session-info",
     "statsmodels",
     "quadprog",
     "pydeseq2>=0.3.6",
@@ -111,6 +109,8 @@ ignore = [
     "D203",
     # We want docstrings to start immediately after the opening triple quote
     "D213",
+
+    "BLE001"
 ]
 
 [tool.ruff.per-file-ignores]

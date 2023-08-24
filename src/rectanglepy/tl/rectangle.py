@@ -1,7 +1,8 @@
 import pandas as pd
 from loguru import logger
 
-from rectanglepy.pp import build_rectangle_signatures, deconvolute
+from rectanglepy.pp import RectangleSignatureResult, build_rectangle_signatures, deconvolute
+from rectanglepy.pp.create_signature import _reduce_to_common_genes
 
 
 def rectangle(
@@ -11,8 +12,8 @@ def rectangle(
     *,
     optimize_cutoffs: bool = True,
     p=0.02,
-    lfc=1.0,
-) -> pd.DataFrame:
+    lfc=2.0,
+) -> tuple[pd.DataFrame, RectangleSignatureResult]:
     """Run rectangle on a dataset.
 
     Parameters
@@ -34,14 +35,26 @@ def rectangle(
 
     """
     _consistency_check(sc_data, annotations, bulks)
+    sc_data = sc_data.loc[sc_data.sum(axis=1) > 10]
+
+    signature_result = build_rectangle_signatures(
+        sc_data, annotations, p=p, lfc=lfc, optimize_cutoffs=optimize_cutoffs, bulks=bulks
+    )
+    logger.info(f"Rectangle signature has {len(signature_result.signature_genes)} genes")
 
     bulks, sc_data = _reduce_to_common_genes(bulks, sc_data)
 
-    signature_result = build_rectangle_signatures(sc_data, annotations, p=p, lfc=lfc, optimize_cutoffs=optimize_cutoffs)
+    estimations_data = {}
+    for column_name, column_data in bulks.items():
+        try:
+            result = deconvolute(signature_result, column_data)
+            estimations_data[column_name] = result
+        except Exception as e:
+            logger.error(f"An error occurred for column {column_name}: {e}")
 
-    estimations = bulks.apply(lambda x: deconvolute(signature_result, x), axis=0)
+    estimations_dataframe = pd.DataFrame(estimations_data)
 
-    return estimations
+    return estimations_dataframe, signature_result
 
 
 def _consistency_check(sc_data: pd.DataFrame, annotations: pd.Series, bulks: pd.DataFrame):
@@ -50,11 +63,3 @@ def _consistency_check(sc_data: pd.DataFrame, annotations: pd.Series, bulks: pd.
     assert isinstance(annotations, pd.Series)
     assert isinstance(bulks, pd.DataFrame)
     assert len(sc_data.columns) == len(annotations.index)
-
-
-def _reduce_to_common_genes(bulks: pd.DataFrame, sc_data: pd.DataFrame):
-    genes = list(set(bulks.index) & set(sc_data.index))
-    logger.info(f"Reducing bulks and sc data to {len(genes)} common genes")
-    sc_data = sc_data.loc[genes].sort_index()
-    bulks = bulks.loc[genes].sort_index()
-    return bulks, sc_data
