@@ -13,6 +13,7 @@ def rectangle(
     optimize_cutoffs: bool = True,
     p=0.02,
     lfc=2.0,
+    n_cpus: int = None,
 ) -> tuple[pd.DataFrame, RectangleSignatureResult]:
     """Run rectangle on a dataset.
 
@@ -30,6 +31,8 @@ def rectangle(
         todo
     lfc
         todo.
+    n_cpus
+        todo
 
 
 
@@ -38,7 +41,7 @@ def rectangle(
     sc_data = sc_data.loc[sc_data.sum(axis=1) > 10]
 
     signature_result = build_rectangle_signatures(
-        sc_data, annotations, p=p, lfc=lfc, optimize_cutoffs=optimize_cutoffs, bulks=bulks
+        sc_data, annotations, p=p, lfc=lfc, optimize_cutoffs=optimize_cutoffs, bulks=bulks, n_cpus=n_cpus
     )
     logger.info(f"Rectangle signature has {len(signature_result.signature_genes)} genes")
 

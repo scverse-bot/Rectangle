@@ -36,8 +36,8 @@ def test_generate_pseudo_bulks(small_data):
     sc_data, annotations, bulk = small_data
     bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations)
 
-    assert bulks.shape == (1000, 30)
-    assert real_fractions.shape == (3, 30)
+    assert bulks.shape == (1000, 50)
+    assert real_fractions.shape == (3, 50)
 
 
 def test_generate_estimated_fractions(small_data):
@@ -46,11 +46,9 @@ def test_generate_estimated_fractions(small_data):
     bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations)
     pseudo_signature_counts = sc_data.groupby(annotations.values, axis=1).sum()
     de_results = _run_deseq2(pseudo_signature_counts)
-    estimated_fractions = _generate_estimated_fractions(
-        pseudo_signature_counts, bulks, 0.9, 0.1, de_results, sc_data, annotations
-    )
+    estimated_fractions = _generate_estimated_fractions(pseudo_signature_counts, bulks, 0.9, 0.1, de_results)
 
-    assert estimated_fractions.shape == (3, 30)
+    assert estimated_fractions.shape == (3, 50)
 
 
 def test_optimize_parameters(small_data):

@@ -115,7 +115,7 @@ def _filter_de_analysis_results(de_analysis_result, p, logfc):
     return adjusted_result
 
 
-def _run_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
+def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, pd.DataFrame]:
     results = {}
     count_df = countsig[countsig.sum(axis=1) > 0].T
     for i, cell_type in enumerate(countsig.columns):
@@ -123,9 +123,9 @@ def _run_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
         condition = np.zeros(len(countsig.columns))
         condition[i] = 1
         clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
-        dds = DeseqDataSet(counts=count_df, metadata=clinical_df, design_factors="condition", quiet=True)
+        dds = DeseqDataSet(counts=count_df, metadata=clinical_df, design_factors="condition", quiet=True, n_cpus=n_cpus)
         dds.deseq2()
-        stat_res = DeseqStats(dds)
+        stat_res = DeseqStats(dds, n_cpus=n_cpus)
         stat_res.summary()
         stat_res.lfc_shrink()
         results[cell_type] = stat_res.results_df
@@ -133,9 +133,11 @@ def _run_deseq2(countsig) -> dict[str | int, pd.DataFrame]:
     return results
 
 
-def _de_analysis(pseudo_count_sig, sc_data, annotations, p, logfc, optimize_cutoffs: bool) -> tuple[Series, list[Any]]:
+def _de_analysis(
+    pseudo_count_sig, sc_data, annotations, p, logfc, optimize_cutoffs: bool, n_cpus: int = None
+) -> tuple[Series, list[Any]]:
     logger.info("Starting DE analysis")
-    deseq_results = _run_deseq2(pseudo_count_sig)
+    deseq_results = _run_deseq2(pseudo_count_sig, n_cpus)
     logger.info("Finished DE analysis")
 
     if optimize_cutoffs:
@@ -211,6 +213,7 @@ def build_rectangle_signatures(
     p=0.02,
     lfc=0.1,
     bulks: pd.DataFrame = None,
+    n_cpus: int = None,
 ) -> RectangleSignatureResult:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
 
@@ -228,6 +231,9 @@ def build_rectangle_signatures(
         The log fold change threshold for the DE analysis (only used if optimize_cutoffs is False).
     bulks
         todo
+    n_cpus
+        The number of cpus to use for the DE analysis. Defaults to the number of cpus available.
+
     Returns
     -------
     The result of the rectangle signature analysis which is of type RectangleSignatureResult.
@@ -245,7 +251,7 @@ def build_rectangle_signatures(
         pseudo_sig_counts = pseudo_sig_counts.sparse.to_dense()
 
     marker_genes, low_gene_cell_types = _de_analysis(
-        pseudo_sig_counts, sc_counts, annotations, p, lfc, optimize_cutoffs
+        pseudo_sig_counts, sc_counts, annotations, p, lfc, optimize_cutoffs, n_cpus
     )
     pseudo_sig_cpm = _convert_to_cpm(pseudo_sig_counts).round().astype(int)
 

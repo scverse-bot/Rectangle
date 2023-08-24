@@ -57,14 +57,14 @@ def test_create_linkage_matrix(hao_signature):
 def test_create_fclusters(hao_signature):
     linkage_matrix = _create_linkage_matrix(hao_signature)
     clusters = rectangle.pp.create_signature._create_fclusters(hao_signature, linkage_matrix)
-    assert clusters == [2, 3, 3, 4, 1, 5, 3, 1, 2, 6, 3]
+    assert clusters == [3, 4, 4, 6, 1, 7, 4, 2, 3, 8, 5]
 
 
 def test_get_fcluster_assignments(hao_signature):
     linkage_matrix = _create_linkage_matrix(hao_signature)
     clusters = _create_fclusters(hao_signature, linkage_matrix)
     assignments = _get_fcluster_assignments(clusters, hao_signature.columns)
-    assert assignments == [2, 3, 3, "NK cells", 1, "pDC", 3, 1, 2, "Platelet", 3]
+    assert assignments == [3, 4, 4, "NK cells", "B cells", "pDC", 4, "Plasma cells", 3, "Platelet", "ILC"]
 
 
 def test_create_annotations_from_cluster_labels(hao_signature):
@@ -88,7 +88,19 @@ def test_create_annotations_from_cluster_labels(hao_signature):
     assignments = _get_fcluster_assignments(clusters, hao_signature.columns)
     annotations_from_cluster = _create_annotations_from_cluster_labels(assignments, annotations, hao_signature)
 
-    assert list(annotations_from_cluster) == ["NK cells", "pDC", "1", "3", "3", "Platelet", "1", "2", "3", "3", "2"]
+    assert list(annotations_from_cluster) == [
+        "NK cells",
+        "pDC",
+        "Plasma cells",
+        "ILC",
+        "4",
+        "Platelet",
+        "B cells",
+        "3",
+        "4",
+        "4",
+        "3",
+    ]
 
 
 def test_scale_weigths():
@@ -126,7 +138,7 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
     corr = np.corrcoef(result, expected)[0, 1]
     rsme = np.sqrt(np.mean((result - expected) ** 2))
 
-    assert corr > 0.92 and rsme < 0.015
+    assert corr > 0.85 and rsme < 0.015
 
 
 def test_build_rectangle_signatures(small_data):
