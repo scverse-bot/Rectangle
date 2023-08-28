@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from loguru import logger
-from pandas import Series
+from pandas import DataFrame, Series
 from pydeseq2.dds import DeseqDataSet
 from pydeseq2.ds import DeseqStats
 from scipy.cluster.hierarchy import fcluster, linkage
@@ -134,19 +134,22 @@ def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, p
 
 
 def _de_analysis(
-    pseudo_count_sig, sc_data, annotations, p, logfc, optimize_cutoffs: bool, n_cpus: int = None
-) -> tuple[Series, list[Any]]:
+    pseudo_count_sig, sc_data, annotations, p, lfc, optimize_cutoffs: bool, n_cpus: int = None
+) -> tuple[Series, list[Any], DataFrame | None]:
     logger.info("Starting DE analysis")
     deseq_results = _run_deseq2(pseudo_count_sig, n_cpus)
     logger.info("Finished DE analysis")
+    optimization_results = None
 
     if optimize_cutoffs:
         logger.info("Optimizing cutoff parameters p and lfc")
-        p, logfc = _optimize_parameters(sc_data, annotations, pseudo_count_sig, deseq_results)
-        logger.info(f"Optimization done\n Best cutoffs  p: {p} and lfc: {logfc}")
-    markers, low_gene_cell_types = _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig)
+        optimization_results = _optimize_parameters(sc_data, annotations, pseudo_count_sig, deseq_results)
+        p, lfc = optimization_results.iloc[0, 0:2]
+        logger.info(f"Optimization done\n Best cutoffs  p: {p} and lfc: {lfc}")
+
+    markers, low_gene_cell_types = _get_marker_genes(deseq_results, lfc, p, pseudo_count_sig)
     logger.info(f"Cell types with low number of marker genes: {str(low_gene_cell_types)}")
-    return pd.Series(markers), low_gene_cell_types
+    return pd.Series(markers), low_gene_cell_types, optimization_results
 
 
 def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
@@ -250,7 +253,7 @@ def build_rectangle_signatures(
         # pseudo signature can be dense, this speeds up the analysis
         pseudo_sig_counts = pseudo_sig_counts.sparse.to_dense()
 
-    marker_genes, low_gene_cell_types = _de_analysis(
+    marker_genes, low_gene_cell_types, optimization_result = _de_analysis(
         pseudo_sig_counts, sc_counts, annotations, p, lfc, optimize_cutoffs, n_cpus
     )
     pseudo_sig_cpm = _convert_to_cpm(pseudo_sig_counts).round().astype(int)
@@ -266,6 +269,7 @@ def build_rectangle_signatures(
             pseudobulk_sig_cpm=pseudo_sig_cpm,
             bias_factors=m_rna_biasfactors,
             low_gene_cell_type=low_gene_cell_types,
+            optimization_result=optimization_result,
         )
 
     clustered_biasfact = _create_bias_factors(clustered_signature, sc_counts, clustered_annotations)
@@ -277,6 +281,7 @@ def build_rectangle_signatures(
         pseudobulk_sig_cpm=pseudo_sig_cpm,
         bias_factors=m_rna_biasfactors,
         low_gene_cell_type=low_gene_cell_types,
+        optimization_result=optimization_result,
         clustered_pseudobulk_sig_cpm=clustered_signature,
         clustered_signature_genes=clustered_genes,
         clustered_bias_factors=clustered_biasfact,
@@ -286,10 +291,15 @@ def build_rectangle_signatures(
 
 def _optimize_parameters(
     sc_data: pd.DataFrame, annotations: pd.Series, pseudo_signature_counts: pd.DataFrame, de_results
-) -> (float, float):
+) -> pd.DataFrame:
     """Optimizes the p-value and log fold change cutoffs for the DE analysis via gridsearch."""
     lfcs = [x / 100 for x in range(160, 210, 10)]
     ps = [x / 1000 for x in range(15, 20, 1)]
+
+    # if there are many cell types we relax the cutoffs
+    if len(pseudo_signature_counts.columns) > 15:
+        lfcs = [x / 100 for x in range(80, 120, 10)]
+        ps = [x / 1000 for x in range(20, 25, 1)]
 
     results = []
     for p in ps:
@@ -299,12 +309,9 @@ def _optimize_parameters(
             results.append({"p": p, "lfc": lfc, "rmse": rmse, "pearson_r": pearson_r})
 
     results_df = pd.DataFrame(results)
+    results_df = results_df.sort_values(by=["pearson_r", "rmse"], ascending=[False, True])
 
-    best_r = results_df["pearson_r"].max()
-    best_p = results_df[results_df["pearson_r"] == best_r]["p"].values[0]
-    best_lfc = results_df[results_df["pearson_r"] == best_r]["lfc"].values[0]
-
-    return best_p, best_lfc
+    return results_df
 
 
 def _assess_parameter_fit(

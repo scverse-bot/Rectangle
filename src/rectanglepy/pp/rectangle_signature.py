@@ -20,6 +20,8 @@ class RectangleSignatureResult:
         The assignments of signature cell-types to clusters, as a list of ints or strings. In the same order as the pseudobulk_sig_cpm columns.
     low_gene_cell_type
         The cell types that have low gene counts, as a list of ints or strings.
+    optimization_result
+        The result of the p lfc cut off optimization, as a pd.DataFrame. Contains the following columns: p, lfc, pearson_r, rsme
     """
 
     def __init__(
@@ -28,6 +30,7 @@ class RectangleSignatureResult:
         bias_factors: pd.Series,
         pseudobulk_sig_cpm: pd.DataFrame,
         low_gene_cell_type: list[any] = None,
+        optimization_result: pd.DataFrame = None,
         clustered_pseudobulk_sig_cpm: pd.DataFrame = None,
         clustered_bias_factors: pd.Series = None,
         clustered_signature_genes: pd.Series = None,
@@ -37,6 +40,7 @@ class RectangleSignatureResult:
         self.bias_factors = bias_factors
         self.pseudobulk_sig_cpm = pseudobulk_sig_cpm
         self.low_gene_cell_type = low_gene_cell_type
+        self.optimization_result = optimization_result
         self.clustered_pseudobulk_sig_cpm = clustered_pseudobulk_sig_cpm
         self.clustered_bias_factors = clustered_bias_factors
         self.clustered_signature_genes = clustered_signature_genes

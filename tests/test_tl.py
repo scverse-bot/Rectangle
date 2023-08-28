@@ -57,9 +57,9 @@ def test_optimize_parameters(small_data):
     pseudo_signature_counts = sc_data.groupby(annotations.values, axis=1).sum()
     de_results = _run_deseq2(pseudo_signature_counts)
     optimized_parameters = _optimize_parameters(sc_data, annotations, pseudo_signature_counts, de_results)
-
-    assert 0.015 <= optimized_parameters[0] <= 0.020
-    assert 0.8 <= optimized_parameters[1] <= 3
+    best_row = optimized_parameters.iloc[0, :]
+    assert 0.015 <= best_row["p"] <= 0.020
+    assert 0.8 <= best_row["lfc"] <= 3
 
 
 def test_rectangle(small_data):
