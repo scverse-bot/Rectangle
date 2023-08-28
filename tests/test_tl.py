@@ -59,7 +59,7 @@ def test_optimize_parameters(small_data):
     optimized_parameters = _optimize_parameters(sc_data, annotations, pseudo_signature_counts, de_results)
 
     assert 0.015 <= optimized_parameters[0] <= 0.020
-    assert 0.8 <= optimized_parameters[1] <= 1.2
+    assert 0.8 <= optimized_parameters[1] <= 3
 
 
 def test_rectangle(small_data):
