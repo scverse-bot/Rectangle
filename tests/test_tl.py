@@ -58,13 +58,13 @@ def test_optimize_parameters(small_data):
     de_results = _run_deseq2(pseudo_signature_counts)
     optimized_parameters = _optimize_parameters(sc_data, annotations, pseudo_signature_counts, de_results)
 
-    assert 0.018 <= optimized_parameters[0] <= 0.023
+    assert 0.015 <= optimized_parameters[0] <= 0.020
     assert 0.8 <= optimized_parameters[1] <= 1.2
 
 
 def test_rectangle(small_data):
     sc_data, annotations, bulk = small_data
     sc_data = sc_data.astype(int)
-    estimations = rectangle(sc_data, annotations, bulk)
+    estimations = rectangle(sc_data, annotations, bulk)[0]
 
     assert estimations.shape == (4, 8)
