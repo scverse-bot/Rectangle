@@ -134,7 +134,7 @@ def _calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
     return pd.Series(approximate_solution, index=signature.columns)
 
 
-def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Series:
+def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_mrna_bias: bool = True) -> pd.Series:
     """Performs recursive deconvolution using rectangle signatures and bulk data.
 
     Parameters
@@ -143,6 +143,8 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Ser
         The rectangle signature result containing the signature data and results.
     bulk
         The bulk data for deconvolution.
+    correct_mrna_bias
+        todo
 
     Returns
     -------
@@ -160,29 +162,31 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series) -> pd.Ser
 
     pseudobulk_sig_cpm = signatures.pseudobulk_sig_cpm
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
+    bias_factors = signatures.bias_factors
 
-    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * signatures.bias_factors
+    if not correct_mrna_bias:
+        bias_factors = bias_factors * 0 + 1
+
+    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * bias_factors
     start_fractions = _calculate_dwls(signature, bulk)
     logger.info("Correct for unknown cell content")
-    start_fractions = correct_for_unknown_cell_content(
-        bulk, pseudobulk_sig_cpm, start_fractions, signatures.bias_factors
-    )
+    start_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, start_fractions, bias_factors)
 
     if clustered_pseudobulk_sig_cpm is None:
         logger.info("Direct deconvolution without recursive step returning result")
         return start_fractions
 
     logger.info("Recursive deconvolution")
-    clustered_signature = (
-        clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * signatures.clustered_bias_factors
-    )
+    cluster_bias_factors = signatures.clustered_bias_factors
+    if not correct_mrna_bias:
+        cluster_bias_factors = cluster_bias_factors * 0 + 1
+
+    clustered_signature = clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * cluster_bias_factors
     clustered_fractions = _calculate_dwls(clustered_signature, bulk)
     recursive_fractions = _calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
 
     logger.info("Correct for unknown cell content")
-    recursive_fractions = correct_for_unknown_cell_content(
-        bulk, pseudobulk_sig_cpm, recursive_fractions, signatures.bias_factors
-    )
+    recursive_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, recursive_fractions, bias_factors)
 
     final_fractions = []
     for cell_type in list(start_fractions.index):

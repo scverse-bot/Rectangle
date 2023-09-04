@@ -14,6 +14,7 @@ def rectangle(
     p=0.02,
     lfc=2.0,
     n_cpus: int = None,
+    correct_mrna_bias: bool = True,
 ) -> tuple[pd.DataFrame, RectangleSignatureResult]:
     """Run rectangle on a dataset.
 
@@ -33,6 +34,8 @@ def rectangle(
         todo.
     n_cpus
         todo
+    correct_mrna_bias
+        todo
 
 
 
@@ -50,7 +53,7 @@ def rectangle(
     estimations_data = {}
     for column_name, column_data in bulks.items():
         try:
-            result = deconvolute(signature_result, column_data)
+            result = deconvolute(signature_result, column_data, correct_mrna_bias=correct_mrna_bias)
             estimations_data[column_name] = result
         except Exception as e:
             logger.error(f"An error occurred for column {column_name}: {e}")
