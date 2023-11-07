@@ -1,12 +1,15 @@
 import math
+import multiprocessing
 
 import numpy as np
 import pandas as pd
 import quadprog
 import statsmodels.api as sm
+from anndata import AnnData
+from joblib import Parallel, delayed, parallel_backend
 from loguru import logger
 
-from .rectangle_signature import RectangleSignatureResult
+from rectanglepy.pp.rectangle_signature import RectangleSignatureResult
 
 
 def _scale_weights(weights):
@@ -134,16 +137,20 @@ def _calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
     return pd.Series(approximate_solution, index=signature.columns)
 
 
-def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_mrna_bias: bool = True) -> pd.Series:
+def deconvolution(
+    signatures: RectangleSignatureResult, bulks: AnnData, correct_mrna_bias: bool = True, n_cpus: int = None
+) -> pd.DataFrame:
     """Performs recursive deconvolution using rectangle signatures and bulk data.
 
     Parameters
     ----------
     signatures
         The rectangle signature result containing the signature data and results.
-    bulk
+    bulks
         The bulk data for deconvolution.
     correct_mrna_bias
+        todo
+    n_cpus
         todo
 
     Returns
@@ -158,8 +165,38 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_m
         - The resulting estimated cell fractions are returned as a pandas Series.
         - If a pseudo signature is available in the `signatures` object, the estimated cell fractions are corrected for unknow cell content using the pseudo signature and the bulk data.
     """
-    logger.info(f"Deconvolute fractions for bulk: {bulk.name}")
+    if n_cpus is not None:
+        num_processes = n_cpus
+    else:
+        num_processes = multiprocessing.cpu_count()
 
+    with parallel_backend("loky", inner_max_num_threads=1):
+        results = Parallel(
+            n_jobs=num_processes,
+        )(
+            delayed(_process_bulk)(signatures, i, bulk, bulks.var_names, correct_mrna_bias)
+            for i, bulk in enumerate(bulks.X)
+        )
+
+    result_df = pd.DataFrame(results, index=bulks.obs_names)
+
+    # Return the result DataFrame
+    return result_df
+
+
+def _process_bulk(signatures, i, bulk, var_names, correct_mrna_bias):
+    logger.info(f"Deconvolute fractions for bulk: {i}")
+    bulk = pd.Series(bulk, index=var_names)
+    result = _deconvolute(signatures, bulk, correct_mrna_bias=correct_mrna_bias)
+    logger.info(f"Finished deconvolution for bulk: {i}")
+    return result
+
+
+def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_mrna_bias: bool = True) -> pd.Series:
+    bulk_direct_reduced = bulk[bulk.index.isin(signatures.signature_genes)]
+    signature_genes_direct_reduced = signatures.signature_genes[
+        signatures.signature_genes.isin(bulk_direct_reduced.index)
+    ]
     pseudobulk_sig_cpm = signatures.pseudobulk_sig_cpm
     clustered_pseudobulk_sig_cpm = signatures.clustered_pseudobulk_sig_cpm
     bias_factors = signatures.bias_factors
@@ -167,25 +204,30 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_m
     if not correct_mrna_bias:
         bias_factors = bias_factors * 0 + 1
 
-    signature = pseudobulk_sig_cpm.loc[signatures.signature_genes] * bias_factors
+    signature = pseudobulk_sig_cpm.loc[signature_genes_direct_reduced] * bias_factors
     start_fractions = _calculate_dwls(signature, bulk)
-    logger.info("Correct for unknown cell content")
     start_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, start_fractions, bias_factors)
 
     if clustered_pseudobulk_sig_cpm is None:
-        logger.info("Direct deconvolution without recursive step returning result")
         return start_fractions
 
-    logger.info("Recursive deconvolution")
     cluster_bias_factors = signatures.clustered_bias_factors
     if not correct_mrna_bias:
         cluster_bias_factors = cluster_bias_factors * 0 + 1
 
-    clustered_signature = clustered_pseudobulk_sig_cpm.loc[signatures.clustered_signature_genes] * cluster_bias_factors
-    clustered_fractions = _calculate_dwls(clustered_signature, bulk)
-    recursive_fractions = _calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
+    bulk_rec_reduced = bulk[bulk.index.isin(clustered_pseudobulk_sig_cpm.index)]
+    clustered_signature_genes = signatures.clustered_signature_genes[
+        signatures.clustered_signature_genes.isin(bulk_rec_reduced.index)
+    ]
 
-    logger.info("Correct for unknown cell content")
+    clustered_signature = clustered_pseudobulk_sig_cpm.loc[clustered_signature_genes] * cluster_bias_factors
+    try:
+        clustered_fractions = _calculate_dwls(clustered_signature, bulk)
+        recursive_fractions = _calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
+    except Exception as e:
+        logger.warning(f"Recursive deconvolution failed with error: {e}")
+        return start_fractions
+
     recursive_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, recursive_fractions, bias_factors)
 
     final_fractions = []
@@ -193,15 +235,16 @@ def deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_m
         if cell_type in signatures.low_gene_cell_type:
             final_fractions.append(recursive_fractions[cell_type])
         else:
-            final_fractions.append((start_fractions[cell_type] * 2 + recursive_fractions[cell_type]) / 3)
+            final_fractions.append(start_fractions[cell_type])
 
     final_fractions = pd.Series(final_fractions, index=start_fractions.index)
+
+    # as we mix the results of two deconvolution steps (start fractions / final fractions), we need to normalize
     if final_fractions.sum() > 1:
         final_fractions = final_fractions / final_fractions.sum()
     else:
         final_fractions["Unknown"] = final_fractions["Unknown"] + (1 - final_fractions.sum())
 
-    logger.info("Deconvolution complete")
     return final_fractions
 
 

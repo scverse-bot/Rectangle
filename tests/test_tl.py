@@ -1,15 +1,29 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
+from anndata import AnnData
 
 from rectanglepy.pp.create_signature import (
-    _generate_estimated_fractions,
-    _generate_pseudo_bulks,
-    _optimize_parameters,
-    _run_deseq2,
+    build_rectangle_signatures,
 )
-from rectanglepy.tl.rectangle import rectangle
+from rectanglepy.tl.deconvolution import (
+    _calculate_dwls,
+    _scale_weights,
+    correct_for_unknown_cell_content,
+    deconvolution,
+    solve_qp,
+)
+
+
+@pytest.fixture
+def quantiseq_data(data_dir):
+    signature = pd.read_csv(data_dir / "TIL10_signature.txt", index_col=0, sep="\t")
+    bulk = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_mixture_small.txt", index_col=0, sep="\t")
+    fractions = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_read_fractions_small.txt", index_col=0, sep="\t")
+    fractions = fractions.iloc[:, :-1]
+    return bulk, fractions, signature
 
 
 @pytest.fixture
@@ -32,39 +46,87 @@ def finotello_bulk(data_dir):
     return bulk
 
 
-def test_generate_pseudo_bulks(small_data):
-    sc_data, annotations, bulk = small_data
-    bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations)
-
-    assert bulks.shape == (1000, 50)
-    assert real_fractions.shape == (3, 50)
+def test_scale_weigths():
+    weights = [1, 0]
+    result = _scale_weights(weights)
+    assert (result == [np.Inf, 0]).all()
 
 
-def test_generate_estimated_fractions(small_data):
-    sc_data, annotations, bulk = small_data
-    sc_data = sc_data.astype(int)
-    bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations)
-    pseudo_signature_counts = sc_data.groupby(annotations.values, axis=1).sum()
-    de_results = _run_deseq2(pseudo_signature_counts)
-    estimated_fractions = _generate_estimated_fractions(pseudo_signature_counts, bulks, 0.9, 0.1, de_results)
+def test_simple_weighted_dampened_deconvolution(quantiseq_data):
+    bulk, real_fractions, signature = quantiseq_data
+    j = 11
+    bulk = bulk.iloc[:, j]
+    expected = real_fractions.T.iloc[:, j]
 
-    assert estimated_fractions.shape == (3, 50)
+    result = _calculate_dwls(signature, bulk)
+    corr = np.corrcoef(result, expected)[0, 1]
+    rsme = np.sqrt(np.mean((result - expected) ** 2))
 
-
-def test_optimize_parameters(small_data):
-    sc_data, annotations, bulk = small_data
-    sc_data = sc_data.astype(int)
-    pseudo_signature_counts = sc_data.groupby(annotations.values, axis=1).sum()
-    de_results = _run_deseq2(pseudo_signature_counts)
-    optimized_parameters = _optimize_parameters(sc_data, annotations, pseudo_signature_counts, de_results)
-    best_row = optimized_parameters.iloc[0, :]
-    assert 0.015 <= best_row["p"] <= 0.020
-    assert 0.8 <= best_row["lfc"] <= 3
+    assert corr > 0.85 and rsme < 0.015
 
 
-def test_rectangle(small_data):
-    sc_data, annotations, bulk = small_data
-    sc_data = sc_data.astype(int)
-    estimations = rectangle(sc_data, annotations, bulk)[0]
+def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
+    sc_counts, annotations, bulk = small_data
+    sc_counts = sc_counts.astype("int")
+    adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
+    signature = build_rectangle_signatures(adata, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
+    bulk, _, _ = quantiseq_data
+    bulk = bulk.iloc[:, 11]
+    pseudo_signature = signature.pseudobulk_sig_cpm
+    sig = pseudo_signature.loc[signature.signature_genes]
+    fractions = _calculate_dwls(sig, bulk)
+    biasfact = (pseudo_signature > 0).sum(axis=0)
+    biasfact = biasfact / biasfact.min()
+    result = correct_for_unknown_cell_content(bulk, pseudo_signature, fractions, biasfact)
+    assert len(fractions) + 1 == len(result)
 
-    assert estimations.shape == (4, 8)
+
+def test_solve_dampened_wsl(quantiseq_data):
+    bulk, real_fractions, signature = quantiseq_data
+    j = 11
+    bulk = bulk.iloc[:, j]
+    expected = real_fractions.T.iloc[:, j]
+
+    genes = list(set(signature.index) & set(bulk.index))
+    signature = signature.loc[genes].sort_index()
+    bulk = bulk.loc[genes].sort_index().astype("double")
+
+    result = solve_qp(signature, bulk)
+    # evaluation metrics
+    corr = np.corrcoef(result, expected)[0, 1]
+    rsme = np.sqrt(np.mean((result - expected) ** 2))
+
+    assert corr > 0.92 and rsme < 0.012
+
+
+def test_deconvolute(small_data, quantiseq_data):
+    sc_counts, annotations, bulk = small_data
+    sc_counts = sc_counts.astype("int")
+    adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
+    signature = build_rectangle_signatures(adata, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
+    bulk, _, _ = quantiseq_data
+    adata_bulk = AnnData(bulk.T, obs=bulk.columns.to_frame(name="bulk"))
+
+    estimations = deconvolution(signature, adata_bulk)
+    assert estimations.shape == (19, 4)
+
+
+def test_deconvolute_sparse(small_data, quantiseq_data):
+    sc_counts, annotations, bulk = small_data
+    sc_counts = sc_counts.astype("int")
+    adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
+    signature = build_rectangle_signatures(adata, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
+    bulk, _, _ = quantiseq_data
+    adata_bulk = AnnData(bulk.T, obs=bulk.columns.to_frame(name="bulk"))
+
+    expected = deconvolution(signature, adata_bulk)
+
+    sc_counts = sc_counts.astype(pd.SparseDtype("int"))
+    csr_sparse_matrix = sc_counts.sparse.to_coo().tocsr()
+    adata_sparse = AnnData(
+        csr_sparse_matrix.T, obs=annotations.to_frame(name="cell_type"), var=sc_counts.index.to_frame(name="gene")
+    )
+    signature_sparse = build_rectangle_signatures(adata_sparse, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
+
+    estimations = deconvolution(signature_sparse, adata_bulk)
+    assert expected.equals(estimations)

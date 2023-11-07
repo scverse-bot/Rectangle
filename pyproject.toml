@@ -19,11 +19,11 @@ urls.Documentation = "https://rectanglepy.readthedocs.io/"
 urls.Source = "https://github.com/bernheder/Rectangle"
 urls.Home-page = "https://github.com/bernheder/Rectangle"
 dependencies = [
-    "scikit-learn",
-    "anndata",
-    "statsmodels",
+    "anndata>=0.8.0",
+    "scikit-learn>=1.2.2",
+    "statsmodels>=0.13.5",
     "quadprog>=0.1.11",
-    "pydeseq2>=0.3.6",
+    "pydeseq2>=0.4.1",
     "loguru",
 ]
 

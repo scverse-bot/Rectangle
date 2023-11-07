@@ -1,3 +1,3 @@
-from .rectangle import rectangle
+from .deconvolution import deconvolution, solve_qp
 
-__all__ = ["rectangle"]
+__all__ = ["deconvolution", "solve_qp"]
