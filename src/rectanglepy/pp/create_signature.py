@@ -168,7 +168,10 @@ def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
         annotation: _filter_de_analysis_results(result, p, logfc) for annotation, result in deseq_results.items()
     }
 
-    low_annotation_cell_types = [annotation for annotation, result in de_analysis_adjusted.items() if len(result) <= 20]
+    low_annotation_threshold = 50
+    low_annotation_cell_types = [
+        annotation for annotation, result in de_analysis_adjusted.items() if len(result) <= low_annotation_threshold
+    ]
 
     pseudo_cpm_sig = _convert_to_cpm(pseudo_count_sig)
     condition_number_matrices = _create_condition_number_matrices(de_analysis_adjusted, pseudo_cpm_sig)

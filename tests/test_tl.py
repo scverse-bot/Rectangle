@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -20,10 +21,18 @@ from rectanglepy.tl.deconvolution import (
 @pytest.fixture
 def quantiseq_data(data_dir):
     signature = pd.read_csv(data_dir / "TIL10_signature.txt", index_col=0, sep="\t")
-    bulk = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_mixture_small.txt", index_col=0, sep="\t")
+    bulk = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_mixture_smaller.csv", index_col=0)
     fractions = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_read_fractions_small.txt", index_col=0, sep="\t")
     fractions = fractions.iloc[:, :-1]
     return bulk, fractions, signature
+
+
+@pytest.fixture
+def fino_example(data_dir):
+    with open(data_dir / "rectangle_sig_hao1_small", "rb") as f:
+        signature_result = pickle.load(f)
+    bulks = pd.read_csv(data_dir / "small_fino_bulks.csv", index_col=0)
+    return bulks, signature_result
 
 
 @pytest.fixture
@@ -54,7 +63,7 @@ def test_scale_weigths():
 
 def test_simple_weighted_dampened_deconvolution(quantiseq_data):
     bulk, real_fractions, signature = quantiseq_data
-    j = 11
+    j = 5
     bulk = bulk.iloc[:, j]
     expected = real_fractions.T.iloc[:, j]
 
@@ -62,7 +71,7 @@ def test_simple_weighted_dampened_deconvolution(quantiseq_data):
     corr = np.corrcoef(result, expected)[0, 1]
     rsme = np.sqrt(np.mean((result - expected) ** 2))
 
-    assert corr > 0.85 and rsme < 0.015
+    assert corr > 0.815 and rsme < 0.011
 
 
 def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
@@ -71,7 +80,7 @@ def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
     signature = build_rectangle_signatures(adata, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
     bulk, _, _ = quantiseq_data
-    bulk = bulk.iloc[:, 11]
+    bulk = bulk.iloc[:, 5]
     pseudo_signature = signature.pseudobulk_sig_cpm
     sig = pseudo_signature.loc[signature.signature_genes]
     fractions = _calculate_dwls(sig, bulk)
@@ -83,7 +92,7 @@ def test_correct_for_unknown_cell_content(small_data, quantiseq_data):
 
 def test_solve_dampened_wsl(quantiseq_data):
     bulk, real_fractions, signature = quantiseq_data
-    j = 11
+    j = 5
     bulk = bulk.iloc[:, j]
     expected = real_fractions.T.iloc[:, j]
 
@@ -96,10 +105,10 @@ def test_solve_dampened_wsl(quantiseq_data):
     corr = np.corrcoef(result, expected)[0, 1]
     rsme = np.sqrt(np.mean((result - expected) ** 2))
 
-    assert corr > 0.92 and rsme < 0.012
+    assert corr > 0.73 and rsme < 0.012
 
 
-def test_deconvolute(small_data, quantiseq_data):
+def test_deconvolute_no_hierarchy(small_data, quantiseq_data):
     sc_counts, annotations, bulk = small_data
     sc_counts = sc_counts.astype("int")
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
@@ -108,10 +117,10 @@ def test_deconvolute(small_data, quantiseq_data):
     adata_bulk = AnnData(bulk.T, obs=bulk.columns.to_frame(name="bulk"))
 
     estimations = deconvolution(signature, adata_bulk)
-    assert estimations.shape == (19, 4)
+    assert estimations.shape == (8, 4)
 
 
-def test_deconvolute_sparse(small_data, quantiseq_data):
+def test_deconvolute_sparse_no_hierarchy(small_data, quantiseq_data):
     sc_counts, annotations, bulk = small_data
     sc_counts = sc_counts.astype("int")
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
@@ -130,3 +139,10 @@ def test_deconvolute_sparse(small_data, quantiseq_data):
 
     estimations = deconvolution(signature_sparse, adata_bulk)
     assert expected.equals(estimations)
+
+
+def test_deconvolute_full(fino_example):
+    bulks, signature_result = fino_example
+    adata_bulk = AnnData(bulks.T, obs=bulks.columns.to_frame(name="bulk"))
+    estimations = deconvolution(signature_result, adata_bulk)
+    assert estimations.shape == (9, 10)

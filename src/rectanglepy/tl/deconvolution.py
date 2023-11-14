@@ -134,6 +134,9 @@ def _calculate_dwls(signature, bulk, prev_assignments=None, prev_weights=None):
         approximate_solution = solution_averages
         iterations += 1
 
+    if iterations == max_iterations:
+        logger.warning("Dampened weighted least squares did not converge, using last solution")
+
     return pd.Series(approximate_solution, index=signature.columns)
 
 
@@ -169,6 +172,12 @@ def deconvolution(
         num_processes = n_cpus
     else:
         num_processes = multiprocessing.cpu_count()
+
+    # calculate number of genes in the signature that are in the bulk
+    signature_genes_direct_reduced = signatures.signature_genes[signatures.signature_genes.isin(list(bulks.var_names))]
+    logger.info(
+        f"Percentage of genes in the signature that are in bulk is {round(len(signature_genes_direct_reduced) / len(signatures.signature_genes) * 100, 2)}%"
+    )
 
     with parallel_backend("loky", inner_max_num_threads=1):
         results = Parallel(
@@ -206,9 +215,9 @@ def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_
 
     signature = pseudobulk_sig_cpm.loc[signature_genes_direct_reduced] * bias_factors
     start_fractions = _calculate_dwls(signature, bulk)
-    start_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, start_fractions, bias_factors)
 
     if clustered_pseudobulk_sig_cpm is None:
+        start_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, start_fractions, bias_factors)
         return start_fractions
 
     cluster_bias_factors = signatures.clustered_bias_factors
@@ -219,8 +228,11 @@ def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_
     clustered_signature_genes = signatures.clustered_signature_genes[
         signatures.clustered_signature_genes.isin(bulk_rec_reduced.index)
     ]
-
     clustered_signature = clustered_pseudobulk_sig_cpm.loc[clustered_signature_genes] * cluster_bias_factors
+
+    union_genes = list(set(signature_genes_direct_reduced) | set(clustered_signature_genes))
+    union_direct_signature = pseudobulk_sig_cpm.loc[union_genes] * bias_factors
+
     try:
         clustered_fractions = _calculate_dwls(clustered_signature, bulk)
         recursive_fractions = _calculate_dwls(signature, bulk, signatures.assignments, clustered_fractions)
@@ -228,23 +240,20 @@ def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_
         logger.warning(f"Recursive deconvolution failed with error: {e}")
         return start_fractions
 
-    recursive_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, recursive_fractions, bias_factors)
+    union_direct_fraction = _calculate_dwls(union_direct_signature, bulk)
+
+    averaged_start_fractions = (start_fractions + union_direct_fraction) / 2
 
     final_fractions = []
-    for cell_type in list(start_fractions.index):
+    for cell_type in list(averaged_start_fractions.index):
         if cell_type in signatures.low_gene_cell_type:
             final_fractions.append(recursive_fractions[cell_type])
         else:
-            final_fractions.append(start_fractions[cell_type])
+            final_fractions.append(averaged_start_fractions[cell_type])
 
-    final_fractions = pd.Series(final_fractions, index=start_fractions.index)
+    final_fractions = pd.Series(final_fractions, index=averaged_start_fractions.index)
 
-    # as we mix the results of two deconvolution steps (start fractions / final fractions), we need to normalize
-    if final_fractions.sum() > 1:
-        final_fractions = final_fractions / final_fractions.sum()
-    else:
-        final_fractions["Unknown"] = final_fractions["Unknown"] + (1 - final_fractions.sum())
-
+    final_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, final_fractions, bias_factors)
     return final_fractions
 
 

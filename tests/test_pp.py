@@ -38,7 +38,7 @@ def small_data(data_dir):
 
 @pytest.fixture
 def hao_signature(data_dir):
-    hao_signature = pd.read_csv(data_dir / "dwls_signature_hao1.csv", index_col=0)
+    hao_signature = pd.read_csv(data_dir / "signature_hao1.csv", index_col=0)
     return hao_signature
 
 
@@ -203,6 +203,6 @@ def test_de_analysis(small_data):
     rs1, rs2, rs3 = _de_analysis(sc_pseudo, adata_sparse.X.T, annotations, 0.3, 0.5, False, None, adata.var_names)
 
     assert 30 < len(r1) < 40
-    assert r2 == ["T cell CD4", "T cell CD8"]
+    assert r2 == ["NK cell", "T cell CD4", "T cell CD8"]
     assert (r1.values == rs1.values).all()
     assert r2 == rs2
