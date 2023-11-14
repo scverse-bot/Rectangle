@@ -5,6 +5,7 @@ import pandas as pd
 from anndata import AnnData
 from loguru import logger
 from pandas import DataFrame, Series
+from pkg_resources import resource_stream
 from pydeseq2.dds import DeseqDataSet
 from pydeseq2.ds import DeseqStats
 from scipy.cluster.hierarchy import fcluster, linkage
@@ -421,3 +422,22 @@ def _reduce_to_common_genes(bulks: pd.DataFrame, sc_data: pd.DataFrame):
     sc_data = sc_data.loc[genes].sort_index()
     bulks = bulks.loc[genes].sort_index()
     return bulks, sc_data
+
+
+def load_tutorial_sc_data():
+    """Loads the single-cell count data, annotations, and bulk data from the tutorial.
+
+    Returns
+    -------
+    The single-cell count data, annotations, and bulk data.
+    """
+    with resource_stream(__name__, "data/hao1_counts_small.csv") as counts_file:
+        sc_counts = pd.read_csv(counts_file, index_col=0)
+
+    with resource_stream(__name__, "data/hao1_annotations_small.csv") as annotations_file:
+        annotations = pd.read_csv(annotations_file, index_col=0)
+
+    with resource_stream(__name__, "data/small_fino_bulks.csv") as bulks_file:
+        bulks = pd.read_csv(bulks_file, index_col=0)
+
+    return sc_counts, annotations, bulks
