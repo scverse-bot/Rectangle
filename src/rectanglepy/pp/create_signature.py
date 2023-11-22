@@ -424,7 +424,7 @@ def _reduce_to_common_genes(bulks: pd.DataFrame, sc_data: pd.DataFrame):
     return bulks, sc_data
 
 
-def load_tutorial_sc_data():
+def load_tutorial_sc_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Loads the single-cell count data, annotations, and bulk data from the tutorial.
 
     Returns
@@ -432,10 +432,10 @@ def load_tutorial_sc_data():
     The single-cell count data, annotations, and bulk data.
     """
     with resource_stream(__name__, "data/hao1_counts_small.csv") as counts_file:
-        sc_counts = pd.read_csv(counts_file, index_col=0)
+        sc_counts = pd.read_csv(counts_file, index_col=0).astype("int")
 
     with resource_stream(__name__, "data/hao1_annotations_small.csv") as annotations_file:
-        annotations = pd.read_csv(annotations_file, index_col=0)
+        annotations = pd.read_csv(annotations_file, index_col=0)["0"]
 
     with resource_stream(__name__, "data/small_fino_bulks.csv") as bulks_file:
         bulks = pd.read_csv(bulks_file, index_col=0)
