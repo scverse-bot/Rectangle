@@ -33,7 +33,7 @@ pip install rectanglepy
 1. Install the latest development version:
 
 ```bash
-pip install git+https://github.com/bernheder/Rectangle.git@main
+pip install git+https://github.com/ComputationalBiomedicineGroup/Rectangle.git@main
 ```
 
 ## Release notes
