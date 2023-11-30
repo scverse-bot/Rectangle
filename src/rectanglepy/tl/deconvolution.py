@@ -242,14 +242,16 @@ def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_
 
     union_direct_fraction = _calculate_dwls(union_direct_signature, bulk)
 
+    averaged_start_fractions = (start_fractions + union_direct_fraction) / 2
+
     final_fractions = []
-    for cell_type in list(union_direct_fraction.index):
+    for cell_type in list(averaged_start_fractions.index):
         if cell_type in signatures.low_gene_cell_type:
             final_fractions.append(recursive_fractions[cell_type])
         else:
-            final_fractions.append(union_direct_fraction[cell_type])
+            final_fractions.append(averaged_start_fractions[cell_type])
 
-    final_fractions = pd.Series(final_fractions, index=union_direct_fraction.index)
+    final_fractions = pd.Series(final_fractions, index=averaged_start_fractions.index)
 
     final_fractions = correct_for_unknown_cell_content(bulk, pseudobulk_sig_cpm, final_fractions, bias_factors)
     return final_fractions
