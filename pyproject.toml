@@ -4,7 +4,7 @@ requires = ["hatchling"]
 
 [project]
 name = "rectanglepy"
-version = "0.0.18"
+version = "0.0.19"
 description = "A very interesting piece of code"
 readme = "README.md"
 requires-python = ">=3.10"
