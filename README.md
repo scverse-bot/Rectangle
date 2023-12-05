@@ -7,7 +7,10 @@
 [link-tests]: https://github.com/bernheder/Rectangle/actions/workflows/test.yml
 [badge-docs]: https://img.shields.io/readthedocs/Rectangle
 
-A very interesting piece of code
+Rectangle embodies a ”second-generation” deconvolution methodology, setting itself apart from other second-generation
+methods through its efficiency in signature creation and its handling of challenges within the deconvolution process.
+To establish a precise deconvolution method, we employ a hierarchical analysis approach, incorporate mRNA bias
+correction, and provide an estimation of unknown cellular content.
 
 ## Getting started
 
