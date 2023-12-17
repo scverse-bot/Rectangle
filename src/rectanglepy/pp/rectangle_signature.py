@@ -11,15 +11,15 @@ class RectangleSignatureResult:
     bias_factors
         The mRNA bias factors associated with each cell type.
     pseudobulk_sig_cpm
-        The pseudo bulk signature build from the single cell data, contains all genes. Normalized to CPM.
+        The pseudo bulk signature build from the single cell data, contains all genes. Normalized to CPM. Columns are cell types, rows are genes.
     clustered_pseudobulk_sig_cpm
-        The  clustered pseudo bulk signature build from the single cell data, contains all genes. Normalized to CPM.
+        The  clustered pseudo bulk signature build from the single cell data, contains all genes. Normalized to CPM. Columns are cell types, rows are genes.
     clustered_bias_factors
-        The bias factors associated with each cluster.
+        The bias factors associated with each cell type cluster.
     cluster_assignments
         The assignments of signature cell-types to clusters, as a list of ints or strings. In the same order as the pseudobulk_sig_cpm columns.
     low_gene_cell_type
-        The cell types that have low gene counts, as a list of ints or strings.
+        List of signature cell types with low number of marker genes, as a list of ints or strings.
     optimization_result
         The result of the p lfc cut off optimization, as a pd.DataFrame. Contains the following columns: p, lfc, pearson_r, rsme
     """
@@ -45,3 +45,21 @@ class RectangleSignatureResult:
         self.clustered_bias_factors = clustered_bias_factors
         self.clustered_signature_genes = clustered_signature_genes
         self.assignments = cluster_assignments
+
+    def get_signature_matrix(self, include_mrna_bias=True) -> pd.DataFrame:
+        """Calculates the signature matrix by multiplying the pseudobulk_sig_cpm DataFrame subset by signature_genes and the bias_factors Series.
+
+        Parameters
+        ----------
+        include_mrna_bias
+            If True, the method includes mRNA bias in the calculation. Defaults to True.
+
+        Returns
+        -------
+        pandas.DataFrame: The signature matrix. Where columns are cell types and rows are genes.
+
+        """
+        if include_mrna_bias:
+            return self.pseudobulk_sig_cpm.loc[self.signature_genes] * self.bias_factors
+        else:
+            return self.pseudobulk_sig_cpm.loc[self.signature_genes]
