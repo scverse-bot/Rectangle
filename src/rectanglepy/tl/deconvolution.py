@@ -91,7 +91,9 @@ def _find_dampening_constant(signature, bulk, qp_gld):
     qp_gld_sum = sum(qp_gld)
     # try multiple values of the dampening constant (multiplier)
     # for each, calculate the variance of the dampened weighted solution for a subset of genes
-    for i in range(math.ceil(np.log2(max(weights_scaled_no_inf)))):
+    max_range = 86
+    multiplier_range = min(max_range, math.ceil(np.log2(max(weights_scaled_no_inf))))
+    for i in range(multiplier_range):
         solutions = []
         multiplier = 2**i
         weights_dampened = np.array([multiplier if multiplier <= x else x for x in weights_scaled]).astype("double")
@@ -194,11 +196,15 @@ def deconvolution(
 
 
 def _process_bulk(signatures, i, bulk, var_names, correct_mrna_bias):
-    logger.info(f"Deconvolute fractions for bulk: {i}")
-    bulk = pd.Series(bulk, index=var_names)
-    result = _deconvolute(signatures, bulk, correct_mrna_bias=correct_mrna_bias)
-    logger.info(f"Finished deconvolution for bulk: {i}")
-    return result
+    try:
+        logger.info(f"Deconvolute fractions for bulk: {i}")
+        bulk = pd.Series(bulk, index=var_names)
+        result = _deconvolute(signatures, bulk, correct_mrna_bias=correct_mrna_bias)
+        logger.info(f"Finished deconvolution for bulk: {i}")
+        return result
+    except Exception as e:
+        logger.warning(f"Deconvolution failed for bulk: {i} with error: {e}")
+        return pd.Series(index=signatures.pseudobulk_sig_cpm.columns)
 
 
 def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_mrna_bias: bool = True) -> pd.Series:
