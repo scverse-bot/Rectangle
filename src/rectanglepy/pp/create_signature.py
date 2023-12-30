@@ -69,6 +69,10 @@ def _calculate_cluster_range(number_of_cell_types: int) -> tuple[int, int]:
     cluster_factor = 3
     if number_of_cell_types > 12:
         cluster_factor = 4
+    if number_of_cell_types > 20:
+        cluster_factor = 6
+    if number_of_cell_types > 50:
+        cluster_factor = 10
     min_number_clusters = max(
         3, number_of_cell_types - cluster_factor
     )  # we don't want to cluster too many cell types together
