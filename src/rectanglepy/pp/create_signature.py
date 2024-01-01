@@ -35,9 +35,8 @@ def _create_condition_number_matrices(de_adjusted, pseudo_signature):
     longest_de_analysis = max(de_adjusted_lengths.values())
 
     loop_range = min(longest_de_analysis, 200)
-    min_number = 3 if loop_range < 50 else 50  # needed for small datasets (like tests) to not have empty matrices
 
-    for i in range(min_number, loop_range):
+    for i in range(30, loop_range):
         condition_number_matrices.append(_create_condition_number_matrix(de_adjusted, pseudo_signature, i))
 
     return condition_number_matrices
@@ -141,9 +140,13 @@ def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, p
         condition[i] = 1
         clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
         dds = DeseqDataSet(counts=count_df, metadata=clinical_df, design_factors="condition", quiet=True, n_cpus=n_cpus)
+        dds.X = dds.X.astype(int)
         dds.deseq2()
+        dds.varm["LFC"] = dds.varm["LFC"].round(4)
+        dds.varm["dispersions"] = dds.varm["dispersions"].round(3)
+
         stat_res = DeseqStats(dds, n_cpus=n_cpus, quiet=True)
-        stat_res.summary()
+        stat_res.summary(quiet=True)
         stat_res.lfc_shrink()
         results[cell_type] = stat_res.results_df
 
@@ -173,7 +176,7 @@ def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
         annotation: _filter_de_analysis_results(result, p, logfc) for annotation, result in deseq_results.items()
     }
 
-    low_annotation_threshold = 50
+    low_annotation_threshold = 30
     low_annotation_cell_types = [
         annotation for annotation, result in de_analysis_adjusted.items() if len(result) <= low_annotation_threshold
     ]
@@ -182,6 +185,8 @@ def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
     condition_number_matrices = _create_condition_number_matrices(de_analysis_adjusted, pseudo_cpm_sig)
     condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
     optimal_condition_index = condition_numbers.index(min(condition_numbers))
+
+    logger.info(f"Optimal condition number index: {optimal_condition_index}")
     optimal_condition_matrix = condition_number_matrices[optimal_condition_index]
 
     markers = optimal_condition_matrix.index
