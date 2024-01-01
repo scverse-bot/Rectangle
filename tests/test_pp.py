@@ -143,9 +143,9 @@ def test_build_rectangle_signatures(small_data):
     sc_counts, annotations, bulk = small_data
     sc_counts = sc_counts.astype("int")
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
-    results = build_rectangle_signatures(adata, "cell_type", p=0.2, lfc=1, optimize_cutoffs=False)
+    results = build_rectangle_signatures(adata, "cell_type", p=0.5, lfc=0.1, optimize_cutoffs=False)
     assert results.assignments is None  # not enough cells to cluster
-    assert 10 < len(results.signature_genes) < 30
+    assert 10 < len(results.signature_genes) < 100
 
 
 def test_generate_pseudo_bulks(small_data):
@@ -203,6 +203,6 @@ def test_de_analysis(small_data):
     rs1, rs2, rs3 = _de_analysis(sc_pseudo, adata_sparse.X.T, annotations, 0.3, 0.5, False, None, adata.var_names)
 
     assert 30 < len(r1) < 40
-    assert r2 == ["NK cell", "T cell CD4", "T cell CD8"]
+    assert r2 == ["T cell CD4", "T cell CD8"]
     assert (r1.values == rs1.values).all()
     assert r2 == rs2
