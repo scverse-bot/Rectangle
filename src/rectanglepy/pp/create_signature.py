@@ -35,8 +35,12 @@ def _create_condition_number_matrices(de_adjusted, pseudo_signature):
     longest_de_analysis = max(de_adjusted_lengths.values())
 
     loop_range = min(longest_de_analysis, 200)
+    range_minimum = 30
 
-    for i in range(30, loop_range):
+    if loop_range < 30:
+        range_minimum = 8
+
+    for i in range(range_minimum, loop_range):
         condition_number_matrices.append(_create_condition_number_matrix(de_adjusted, pseudo_signature, i))
 
     return condition_number_matrices
@@ -235,8 +239,8 @@ def build_rectangle_signatures(
     optimize_cutoffs=True,
     layer: str = None,
     raw: bool = False,
-    p=0.02,
-    lfc=0.1,
+    p=0.015,
+    lfc=1.5,
     n_cpus: int = None,
 ) -> RectangleSignatureResult:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
@@ -345,10 +349,12 @@ def _optimize_parameters(
         lfcs = [x / 100 for x in range(60, 110, 10)]
 
     results = []
+    logger.info("generating pseudo bulks")
+    bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations, genes)
     for p in ps:
         for lfc in lfcs:
             rmse, pearson_r = _assess_parameter_fit(
-                lfc, p, sc_data, annotations, pseudo_signature_counts, de_results, genes
+                lfc, p, bulks, real_fractions, pseudo_signature_counts, de_results, genes
             )
             logger.info(f"RMSE:{rmse}, Pearson R:{pearson_r} for p={p}, lfc={lfc}")
             results.append({"p": p, "lfc": lfc, "rmse": rmse, "pearson_r": pearson_r})
@@ -360,9 +366,8 @@ def _optimize_parameters(
 
 
 def _assess_parameter_fit(
-    lfc: float, p: float, sc_data: pd.DataFrame, annotations: pd.Series, pseudo_signature_counts, de_results, genes=None
+    lfc: float, p: float, bulks, real_fractions, pseudo_signature_counts, de_results, genes=None
 ) -> (float, float):
-    bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations, genes)
     estimated_fractions = _generate_estimated_fractions(pseudo_signature_counts, bulks, p, lfc, de_results)
 
     real_fractions = real_fractions.sort_index()
