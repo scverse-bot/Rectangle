@@ -173,16 +173,16 @@ def test_asses_fit(small_data):
     de_result = _run_deseq2(sc_pseudo, None)
 
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
-    result = _assess_parameter_fit(0.1, 0.9, adata.X.T, annotations, sc_pseudo, de_result, adata.var_names)
+    bulks, real_fractions = _generate_pseudo_bulks(adata.X.T, annotations, adata.var_names)
+    result = _assess_parameter_fit(0.1, 0.9, bulks, real_fractions, sc_pseudo, de_result)
 
     sc_data = sc_counts.astype(pd.SparseDtype("int"))
     csr_sparse_matrix = sc_data.sparse.to_coo().tocsr()
     adata_sparse = AnnData(
         csr_sparse_matrix.T, obs=annotations.to_frame(name="cell_type"), var=adata.var_names.to_frame(name="gene")
     )
-    result_sparse = _assess_parameter_fit(
-        0.1, 0.9, adata_sparse.X.T, annotations, sc_pseudo, de_result, adata_sparse.var_names
-    )
+    bulks_sparse, real_fractions_sparse = _generate_pseudo_bulks(adata_sparse.X.T, annotations, adata_sparse.var_names)
+    result_sparse = _assess_parameter_fit(0.1, 0.9, bulks_sparse, real_fractions_sparse, sc_pseudo, de_result)
 
     assert len(result) == 2
     assert 0.10 < result[0] < 0.15

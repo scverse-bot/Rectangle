@@ -353,9 +353,7 @@ def _optimize_parameters(
     bulks, real_fractions = _generate_pseudo_bulks(sc_data, annotations, genes)
     for p in ps:
         for lfc in lfcs:
-            rmse, pearson_r = _assess_parameter_fit(
-                lfc, p, bulks, real_fractions, pseudo_signature_counts, de_results, genes
-            )
+            rmse, pearson_r = _assess_parameter_fit(lfc, p, bulks, real_fractions, pseudo_signature_counts, de_results)
             logger.info(f"RMSE:{rmse}, Pearson R:{pearson_r} for p={p}, lfc={lfc}")
             results.append({"p": p, "lfc": lfc, "rmse": rmse, "pearson_r": pearson_r})
 
@@ -366,7 +364,7 @@ def _optimize_parameters(
 
 
 def _assess_parameter_fit(
-    lfc: float, p: float, bulks, real_fractions, pseudo_signature_counts, de_results, genes=None
+    lfc: float, p: float, bulks, real_fractions, pseudo_signature_counts, de_results
 ) -> (float, float):
     estimated_fractions = _generate_estimated_fractions(pseudo_signature_counts, bulks, p, lfc, de_results)
 
