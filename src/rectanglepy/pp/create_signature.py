@@ -290,7 +290,7 @@ def build_rectangle_signatures(
         pseudo_sig_counts, sc_counts, annotations, p, lfc, optimize_cutoffs, n_cpus, genes
     )
     pseudo_sig_cpm = _convert_to_cpm(pseudo_sig_counts)
-    logger.info("Starting rectangle signature analysis")
+    logger.info("Starting rectangle cluster analysis")
 
     clustered_signature, clustered_annotations, assignments = _create_clustered_data(
         pseudo_sig_cpm, marker_genes, annotations, sc_counts, genes
@@ -342,7 +342,7 @@ def _optimize_parameters(
 
     # if there are many cell types we relax the cutoffs
     if len(pseudo_signature_counts.columns) > 8:
-        lfcs = [x / 100 for x in range(110, 170, 10)]
+        lfcs = [x / 100 for x in range(140, 200, 10)]
         ps = [x / 1000 for x in range(15, 20, 1)]
 
     if len(pseudo_signature_counts.columns) > 15:
