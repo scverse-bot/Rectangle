@@ -337,10 +337,6 @@ def _optimize_parameters(
     lfcs = [x / 100 for x in range(170, 220, 10)]
     ps = [x / 1000 for x in range(11, 16, 1)]
 
-    # if there are many cell types we relax the cutoffs
-    if len(pseudo_signature_counts.columns) > 8:
-        lfcs = [x / 100 for x in range(150, 200, 10)]
-
     if len(pseudo_signature_counts.columns) > 15:
         lfcs = [x / 100 for x in range(60, 110, 10)]
 
