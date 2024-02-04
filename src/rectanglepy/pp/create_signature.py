@@ -344,9 +344,10 @@ def _create_pseudo_count_sig(sc_counts: np.ndarray, annotations: pd.Series, var_
 def _optimize_parameters(
     sc_data: pd.DataFrame, annotations: pd.Series, pseudo_signature_counts: pd.DataFrame, de_results, genes=None
 ) -> pd.DataFrame:
-    """Optimizes the p-value and log fold change cutoffs for the DE analysis via gridsearch."""
-    lfcs = [x / 100 for x in range(170, 220, 10)]
-    ps = [x / 1000 for x in range(11, 16, 1)]
+    # if there are many cell types we relax the cutoffs
+    if len(pseudo_signature_counts.columns) > 8:
+        lfcs = [x / 100 for x in range(140, 200, 10)]
+        ps = [x / 1000 for x in range(15, 20, 1)]
 
     results = []
     logger.info("generating pseudo bulks")
