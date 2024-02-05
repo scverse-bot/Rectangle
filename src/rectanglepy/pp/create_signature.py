@@ -144,7 +144,6 @@ def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, p
         condition[i] = 1
         clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
         dds = DeseqDataSet(counts=count_df, metadata=clinical_df, design_factors="condition", quiet=True, n_cpus=n_cpus)
-        dds.X = dds.X.astype(int)
         dds.deseq2()
         dds.varm["LFC"] = dds.varm["LFC"].round(4)
         dds.varm["dispersions"] = dds.varm["dispersions"].round(3)
@@ -235,6 +234,7 @@ def _create_clustered_data(
 def build_rectangle_signatures(
     adata: AnnData,
     cell_type_col: str = "cell_type",
+    bulk_genes: list[str] = None,
     *,
     optimize_cutoffs=True,
     layer: str = None,
@@ -266,10 +266,18 @@ def build_rectangle_signatures(
         todo
     raw
         todo
+    bulk_genes
+        todo
     Returns
     -------
     The result of the rectangle signature analysis which is of type RectangleSignatureResult.
     """
+    if bulk_genes is not None:
+        genes = list(set(bulk_genes) & set(adata.var_names))
+        # sort
+        genes = sorted(genes)
+        adata = adata[:, genes]
+
     if layer is not None:
         sc_counts = adata.layers[layer]
     elif raw:
@@ -336,17 +344,9 @@ def _create_pseudo_count_sig(sc_counts: np.ndarray, annotations: pd.Series, var_
 def _optimize_parameters(
     sc_data: pd.DataFrame, annotations: pd.Series, pseudo_signature_counts: pd.DataFrame, de_results, genes=None
 ) -> pd.DataFrame:
-    """Optimizes the p-value and log fold change cutoffs for the DE analysis via gridsearch."""
-    lfcs = [x / 100 for x in range(170, 220, 10)]
-    ps = [x / 1000 for x in range(11, 16, 1)]
-
     # if there are many cell types we relax the cutoffs
-    if len(pseudo_signature_counts.columns) > 8:
-        lfcs = [x / 100 for x in range(140, 200, 10)]
-        ps = [x / 1000 for x in range(15, 20, 1)]
-
-    if len(pseudo_signature_counts.columns) > 15:
-        lfcs = [x / 100 for x in range(60, 110, 10)]
+    lfcs = [x / 100 for x in range(140, 200, 10)]
+    ps = [x / 1000 for x in range(15, 20, 1)]
 
     results = []
     logger.info("generating pseudo bulks")
