@@ -34,7 +34,7 @@ def _create_condition_number_matrices(de_adjusted, pseudo_signature):
     de_adjusted_lengths = {annotation: len(de_adjusted[annotation]) for annotation in de_adjusted}
     longest_de_analysis = max(de_adjusted_lengths.values())
 
-    loop_range = min(longest_de_analysis, 200)
+    loop_range = min(longest_de_analysis, 150)
     range_minimum = 30
 
     if loop_range < 30:
