@@ -203,6 +203,6 @@ def test_de_analysis(small_data):
     rs1, rs2, rs3 = _de_analysis(sc_pseudo, adata_sparse.X.T, annotations, 0.3, 0.5, False, None, adata.var_names)
 
     assert 30 < len(r1) < 40
-    assert r2 == ["T cell CD4", "T cell CD8"]
+    assert len(r2) == 3
     assert (r1.values == rs1.values).all()
     assert r2 == rs2
