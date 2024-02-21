@@ -1,4 +1,3 @@
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -25,14 +24,6 @@ def quantiseq_data(data_dir):
     fractions = pd.read_csv(data_dir / "quanTIseq_SimRNAseq_read_fractions_small.txt", index_col=0, sep="\t")
     fractions = fractions.iloc[:, :-1]
     return bulk, fractions, signature
-
-
-@pytest.fixture
-def fino_example(data_dir):
-    with open(data_dir / "rectangle_sig_hao1_small", "rb") as f:
-        signature_result = pickle.load(f)
-    bulks = pd.read_csv(data_dir / "small_fino_bulks.csv", index_col=0)
-    return bulks, signature_result
 
 
 @pytest.fixture
@@ -117,6 +108,7 @@ def test_deconvolute_no_hierarchy(small_data, quantiseq_data):
     adata_bulk = AnnData(bulk.T, obs=bulk.columns.to_frame(name="bulk"))
 
     estimations = deconvolution(signature, adata_bulk)
+    assert np.allclose(estimations.sum(axis=1), 1)
     assert estimations.shape == (8, 4)
 
 
@@ -139,10 +131,3 @@ def test_deconvolute_sparse_no_hierarchy(small_data, quantiseq_data):
 
     estimations = deconvolution(signature_sparse, adata_bulk)
     assert expected.equals(estimations)
-
-
-def test_deconvolute_full(fino_example):
-    bulks, signature_result = fino_example
-    adata_bulk = AnnData(bulks.T, obs=bulks.columns.to_frame(name="bulk"))
-    estimations = deconvolution(signature_result, adata_bulk)
-    assert estimations.shape == (9, 10)

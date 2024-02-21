@@ -1,5 +1,3 @@
-from typing import Any
-
 import numpy as np
 import pandas as pd
 from anndata import AnnData
@@ -37,13 +35,13 @@ def _create_condition_number_matrices(de_adjusted, pseudo_signature):
     loop_range = min(longest_de_analysis, 200)
     range_minimum = 30
 
-    if loop_range < 30:
+    if loop_range < range_minimum:
         range_minimum = 8
 
     for i in range(range_minimum, loop_range):
         condition_number_matrices.append(_create_condition_number_matrix(de_adjusted, pseudo_signature, i))
 
-    return condition_number_matrices
+    return condition_number_matrices, range_minimum
 
 
 def _find_signature_genes(number_of_genes, de_result):
@@ -158,7 +156,7 @@ def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, p
 
 def _de_analysis(
     pseudo_count_sig, sc_data, annotations, p, lfc, optimize_cutoffs: bool, n_cpus: int = None, genes=None
-) -> tuple[Series, list[Any], DataFrame | None]:
+) -> tuple[Series, dict[str, int] :, DataFrame | None]:
     logger.info("Starting DE analysis")
     deseq_results = _run_deseq2(pseudo_count_sig, n_cpus)
     optimization_results = None
@@ -169,9 +167,8 @@ def _de_analysis(
         p, lfc = optimization_results.iloc[0, 0:2]
         logger.info(f"Optimization done\n Best cutoffs  p: {p} and lfc: {lfc}")
 
-    markers, low_gene_cell_types = _get_marker_genes(deseq_results, lfc, p, pseudo_count_sig)
-    logger.info(f"Cell types with low number of marker genes: {str(low_gene_cell_types)}")
-    return pd.Series(markers), low_gene_cell_types, optimization_results
+    markers, marker_genes_per_cell_type = _get_marker_genes(deseq_results, lfc, p, pseudo_count_sig)
+    return pd.Series(markers), marker_genes_per_cell_type, optimization_results
 
 
 def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
@@ -179,21 +176,26 @@ def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
         annotation: _filter_de_analysis_results(result, p, logfc) for annotation, result in deseq_results.items()
     }
 
-    low_annotation_threshold = 30
-    low_annotation_cell_types = [
-        annotation for annotation, result in de_analysis_adjusted.items() if len(result) <= low_annotation_threshold
-    ]
-
     pseudo_cpm_sig = _convert_to_cpm(pseudo_count_sig)
-    condition_number_matrices = _create_condition_number_matrices(de_analysis_adjusted, pseudo_cpm_sig)
+    condition_number_matrices, range_minimum = _create_condition_number_matrices(de_analysis_adjusted, pseudo_cpm_sig)
     condition_numbers = [np.linalg.cond(np.linalg.qr(x)[1], 1) for x in condition_number_matrices]
     optimal_condition_index = condition_numbers.index(min(condition_numbers))
 
-    logger.info(f"Optimal condition number index: {optimal_condition_index}")
+    optimal_condition_number = optimal_condition_index + range_minimum
+    logger.info(f"Optimal condition number: {optimal_condition_number}")
     optimal_condition_matrix = condition_number_matrices[optimal_condition_index]
 
     markers = optimal_condition_matrix.index
-    return markers, low_annotation_cell_types
+    marker_genes_per_cell_type = _count_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_number)
+    return markers, marker_genes_per_cell_type
+
+
+def _count_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_number: int) -> dict[str, int]:
+    marker_genes_per_cell_type = {}
+    for annotation, result in de_analysis_adjusted.items():
+        marker_genes_per_cell_type[annotation] = min(len(result), optimal_condition_number)
+    logger.info(f"Number of marker genes per cell type: {str(marker_genes_per_cell_type)}")
+    return marker_genes_per_cell_type
 
 
 def _create_bias_factors(countsig: pd.DataFrame, sc_counts: pd.DataFrame | np.ndarray, annotations) -> pd.Series:
@@ -294,7 +296,7 @@ def build_rectangle_signatures(
     pseudo_sig_counts = _create_pseudo_count_sig(sc_counts, annotations, genes)
     m_rna_biasfactors = _create_bias_factors(pseudo_sig_counts, sc_counts, annotations)
 
-    marker_genes, low_gene_cell_types, optimization_result = _de_analysis(
+    marker_genes, marker_genes_per_cell_type, optimization_result = _de_analysis(
         pseudo_sig_counts, sc_counts, annotations, p, lfc, optimize_cutoffs, n_cpus, genes
     )
     pseudo_sig_cpm = _convert_to_cpm(pseudo_sig_counts)
@@ -309,7 +311,7 @@ def build_rectangle_signatures(
             signature_genes=marker_genes,
             pseudobulk_sig_cpm=pseudo_sig_cpm,
             bias_factors=m_rna_biasfactors,
-            low_gene_cell_type=low_gene_cell_types,
+            marker_genes_per_cell_type=marker_genes_per_cell_type,
             optimization_result=optimization_result,
         )
 
@@ -320,7 +322,7 @@ def build_rectangle_signatures(
         signature_genes=marker_genes,
         pseudobulk_sig_cpm=pseudo_sig_cpm,
         bias_factors=m_rna_biasfactors,
-        low_gene_cell_type=low_gene_cell_types,
+        marker_genes_per_cell_type=marker_genes_per_cell_type,
         optimization_result=optimization_result,
         clustered_pseudobulk_sig_cpm=clustered_signature,
         clustered_signature_genes=clustered_genes,
