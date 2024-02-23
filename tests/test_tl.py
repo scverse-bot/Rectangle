@@ -105,9 +105,8 @@ def test_deconvolute_no_hierarchy(small_data, quantiseq_data):
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
     signature = build_rectangle_signatures(adata, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
     bulk, _, _ = quantiseq_data
-    adata_bulk = AnnData(bulk.T, obs=bulk.columns.to_frame(name="bulk"))
 
-    estimations = deconvolution(signature, adata_bulk)
+    estimations = deconvolution(signature, bulk.T)
     assert np.allclose(estimations.sum(axis=1), 1)
     assert estimations.shape == (8, 4)
 
@@ -118,9 +117,8 @@ def test_deconvolute_sparse_no_hierarchy(small_data, quantiseq_data):
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
     signature = build_rectangle_signatures(adata, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
     bulk, _, _ = quantiseq_data
-    adata_bulk = AnnData(bulk.T, obs=bulk.columns.to_frame(name="bulk"))
 
-    expected = deconvolution(signature, adata_bulk)
+    expected = deconvolution(signature, bulk.T)
 
     sc_counts = sc_counts.astype(pd.SparseDtype("int"))
     csr_sparse_matrix = sc_counts.sparse.to_coo().tocsr()
@@ -129,5 +127,5 @@ def test_deconvolute_sparse_no_hierarchy(small_data, quantiseq_data):
     )
     signature_sparse = build_rectangle_signatures(adata_sparse, "cell_type", p=0.9, lfc=0.1, optimize_cutoffs=False)
 
-    estimations = deconvolution(signature_sparse, adata_bulk)
+    estimations = deconvolution(signature_sparse, bulk.T)
     assert expected.equals(estimations)

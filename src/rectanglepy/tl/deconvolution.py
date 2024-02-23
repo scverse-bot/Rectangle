@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import quadprog
 import statsmodels.api as sm
-from anndata import AnnData
 from joblib import Parallel, delayed, parallel_backend
 from loguru import logger
 
@@ -159,7 +158,10 @@ def _calculate_dwls(
 
 
 def deconvolution(
-    signatures: RectangleSignatureResult, bulks: AnnData, correct_mrna_bias: bool = True, n_cpus: Optional[int] = None
+    signatures: RectangleSignatureResult,
+    bulks: pd.DataFrame,
+    correct_mrna_bias: bool = True,
+    n_cpus: Optional[int] = None,
 ) -> pd.DataFrame:
     """Performs recursive deconvolution using rectangle signatures and bulk data.
 
@@ -167,8 +169,8 @@ def deconvolution(
     ----------
     signatures : RectangleSignatureResult
         The rectangle signature result containing the signature data and results.
-    bulks : AnnData
-        The tpm normalized bulk data for deconvolution.
+    bulks : pd.DataFrame
+        The tpm normalized bulk data for deconvolution. Rows are samples and columns are genes.
     correct_mrna_bias : bool, optional
         A flag indicating whether to correct for mRNA bias. Defaults to True.
     n_cpus : int, optional
@@ -185,21 +187,15 @@ def deconvolution(
     else:
         num_processes = multiprocessing.cpu_count()
 
-    # calculate number of genes in the signature that are in the bulk
-    signature_genes_direct_reduced = signatures.signature_genes[signatures.signature_genes.isin(list(bulks.var_names))]
-    logger.info(
-        f"Percentage of genes in the signature that are in bulk is {round(len(signature_genes_direct_reduced) / len(signatures.signature_genes) * 100, 2)}%"
-    )
-
     with parallel_backend("loky", inner_max_num_threads=1):
         results = Parallel(
             n_jobs=num_processes,
         )(
-            delayed(_process_bulk)(signatures, i, bulk, bulks.var_names, correct_mrna_bias)
-            for i, bulk in enumerate(bulks.X)
+            delayed(_process_bulk)(signatures, i, bulk, bulks.columns, correct_mrna_bias)
+            for i, bulk in enumerate(bulks.values)
         )
 
-    result_df = pd.DataFrame(results, index=bulks.obs_names)
+    result_df = pd.DataFrame(results, index=bulks.index)
 
     # Return the result DataFrame
     return result_df
