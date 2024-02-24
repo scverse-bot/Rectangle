@@ -143,7 +143,7 @@ def test_build_rectangle_signatures(small_data):
     sc_counts, annotations, bulk = small_data
     sc_counts = sc_counts.astype("int")
     adata = AnnData(sc_counts.T, obs=annotations.to_frame(name="cell_type"))
-    results = build_rectangle_signatures(adata, "cell_type", p=0.5, lfc=0.1, optimize_cutoffs=False)
+    results = build_rectangle_signatures(adata, "cell_type", bulks=bulk.T, p=0.5, lfc=0.1, optimize_cutoffs=False)
     assert results.assignments is None  # not enough cells to cluster
     assert 10 < len(results.signature_genes) < 100
 
