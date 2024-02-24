@@ -236,7 +236,7 @@ def _create_clustered_data(
 def build_rectangle_signatures(
     adata: AnnData,
     cell_type_col: str = "cell_type",
-    bulk_genes: list[str] = None,
+    bulks: pd.DataFrame = None,
     *,
     optimize_cutoffs=True,
     layer: str = None,
@@ -259,8 +259,8 @@ def build_rectangle_signatures(
         The p-value threshold for the DE analysis (only used if optimize_cutoffs is False).
     lfc
         The log fold change threshold for the DE analysis (only used if optimize_cutoffs is False).
-    bulks
-        todo
+    bulks: pd.DataFrame
+        The tpm normalized bulk data for deconvolution. Rows are samples and columns are genes.
     n_cpus
         The number of cpus to use for the DE analysis. Defaults to the number of cpus available.
 
@@ -268,16 +268,14 @@ def build_rectangle_signatures(
         todo
     raw
         todo
-    bulk_genes
-        todo
     Returns
     -------
     The result of the rectangle signature analysis which is of type RectangleSignatureResult.
     """
-    if bulk_genes is not None:
-        genes = list(set(bulk_genes) & set(adata.var_names))
-        # sort
+    if bulks is not None:
+        genes = list(set(bulks.columns) & set(adata.var_names))
         genes = sorted(genes)
+        assert len(genes) > 0, "No common genes between bulks and single-cell data"
         adata = adata[:, genes]
 
     if layer is not None:
