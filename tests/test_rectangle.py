@@ -27,7 +27,7 @@ def test_rectangle_consensus():
     sc_data_adata = AnnData(sc_data, obs=annotations.to_frame(name="cell_type"))
 
     result = rectanglepy.rectangle(
-        sc_data_adata, bulks, optimize_cutoffs=False, p=0.2, lfc=0.1, consensus_runs=2, sample_size=8
+        sc_data_adata, bulks, optimize_cutoffs=False, p=0.5, lfc=0.0, consensus_runs=2, sample_size=9
     )
 
     assert isinstance(result[0], pd.DataFrame)
