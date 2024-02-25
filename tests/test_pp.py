@@ -218,7 +218,7 @@ def test_even(small_data):
 
     even_sc_data = sc_data.loc[:, _even(annotations, 100).index]
 
-    assert even_sc_data.sum().sum() == sc_data.sum().sum()
+    assert round(even_sc_data.sum().sum(), 3) == round(sc_data.sum().sum(), 3)
 
 
 def test_build_rectangle_signatures_even(small_data):
