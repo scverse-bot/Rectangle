@@ -242,6 +242,8 @@ def build_rectangle_signatures(
     raw: bool = False,
     p=0.015,
     lfc=1.5,
+    balance_sc_data: bool = False,
+    balance_number: int = 1500,
     n_cpus: int = None,
 ) -> RectangleSignatureResult:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
@@ -267,6 +269,12 @@ def build_rectangle_signatures(
         todo
     raw
         todo
+    balance_sc_data : bool, optional
+        A flag indicating whether to balance the single-cell data. Defaults to False.
+    balance_number : int, optional
+        The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
+
+
     Returns
     -------
     The result of the rectangle signature analysis which is of type RectangleSignatureResult.
@@ -278,6 +286,11 @@ def build_rectangle_signatures(
         logger.info(f"Using {len(genes)} common genes between bulks and single-cell data")
         adata = adata[:, genes]
 
+    annotations = adata.obs[cell_type_col]
+    if balance_sc_data:
+        annotations = _even(annotations, balance_number)
+        adata = adata[annotations.index]
+
     if layer is not None:
         sc_counts = adata.layers[layer]
     elif raw:
@@ -286,8 +299,6 @@ def build_rectangle_signatures(
         sc_counts = adata.X
 
     sc_counts = sc_counts.T
-
-    annotations = adata.obs[cell_type_col]
 
     genes = adata.var_names
 
@@ -434,3 +445,14 @@ def _reduce_to_common_genes(bulks: pd.DataFrame, sc_data: pd.DataFrame):
     sc_data = sc_data.loc[genes].sort_index()
     bulks = bulks.loc[genes].sort_index()
     return bulks, sc_data
+
+
+def _even(annotations: pd.Series, number: int) -> pd.Series:
+    assert number > 0, "Number of cells must be greater than 0"
+    annotation_counts = annotations.value_counts()
+    selected_cells = []
+    for annotation in annotation_counts.index:
+        cells = annotations[annotations == annotation].index
+        cells = np.random.choice(cells, min(number, len(cells)), replace=False)
+        selected_cells.extend(cells)
+    return annotations.loc[selected_cells]

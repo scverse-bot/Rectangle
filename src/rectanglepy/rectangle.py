@@ -18,6 +18,8 @@ def rectangle(
     optimize_cutoffs=True,
     p=0.015,
     lfc=1.5,
+    balance_sc_data: bool = False,
+    balance_number: int = 1500,
     n_cpus: int = None,
 ) -> tuple[DataFrame, RectangleSignatureResult]:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
@@ -45,6 +47,10 @@ def rectangle(
         todo
     correct_mrna_bias : bool, optional
         A flag indicating whether to correct for mRNA bias. Defaults to True.
+    balance_sc_data : bool, optional
+        A flag indicating whether to balance the single-cell data. Defaults to False.
+    balance_number : int, optional
+        The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
 
     Returns
     -------
@@ -69,6 +75,8 @@ def rectangle(
         p=p,
         lfc=lfc,
         n_cpus=n_cpus,
+        balance_sc_data=balance_sc_data,
+        balance_number=balance_number,
     )
     cell_fractions = deconvolution(signatures, bulks, correct_mrna_bias, n_cpus)
 
