@@ -232,8 +232,8 @@ def test_build_rectangle_signatures_even(small_data):
         p=0.5,
         lfc=0.1,
         optimize_cutoffs=False,
-        balance_sc_data=True,
-        balance_number=1000,
+        subsample=True,
+        sample_size=1000,
     )
     results_uneven = build_rectangle_signatures(
         adata, "cell_type", bulks=bulk.T, p=0.5, lfc=0.1, optimize_cutoffs=False

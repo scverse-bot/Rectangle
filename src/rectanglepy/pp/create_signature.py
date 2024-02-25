@@ -242,8 +242,8 @@ def build_rectangle_signatures(
     raw: bool = False,
     p=0.015,
     lfc=1.5,
-    balance_sc_data: bool = False,
-    balance_number: int = 1500,
+    subsample: bool = False,
+    sample_size: int = 1500,
     n_cpus: int = None,
 ) -> RectangleSignatureResult:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
@@ -269,9 +269,9 @@ def build_rectangle_signatures(
         todo
     raw
         todo
-    balance_sc_data : bool, optional
-        A flag indicating whether to balance the single-cell data. Defaults to False.
-    balance_number : int, optional
+    subsample : bool, optional
+        A flag indicating whether to evenly subsample the single-cell data. Defaults to False.
+    sample_size : int, optional
         The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
 
 
@@ -287,8 +287,8 @@ def build_rectangle_signatures(
         adata = adata[:, genes]
 
     annotations = adata.obs[cell_type_col]
-    if balance_sc_data:
-        annotations = _even(annotations, balance_number)
+    if subsample:
+        annotations = _even(annotations, sample_size)
         adata = adata[annotations.index]
 
     if layer is not None:

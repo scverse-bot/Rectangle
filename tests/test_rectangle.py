@@ -20,3 +20,15 @@ def test_rectangle():
 
     assert isinstance(result[0], pd.DataFrame)
     assert isinstance(result[1], RectangleSignatureResult)
+
+
+def test_rectangle_consensus():
+    sc_data, annotations, bulks = rectanglepy.load_tutorial_data()
+    sc_data_adata = AnnData(sc_data, obs=annotations.to_frame(name="cell_type"))
+
+    result = rectanglepy.rectangle(
+        sc_data_adata, bulks, optimize_cutoffs=False, p=0.2, lfc=0.1, consensus_runs=2, sample_size=8
+    )
+
+    assert isinstance(result[0], pd.DataFrame)
+    assert isinstance(result[1], RectangleSignatureResult)

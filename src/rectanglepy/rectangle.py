@@ -1,5 +1,6 @@
 import pandas as pd
 from anndata import AnnData
+from loguru import logger
 from pandas import DataFrame
 from pkg_resources import resource_stream
 
@@ -18,8 +19,9 @@ def rectangle(
     optimize_cutoffs=True,
     p=0.015,
     lfc=1.5,
-    balance_sc_data: bool = False,
-    balance_number: int = 1500,
+    subsample: bool = False,
+    sample_size: int = 1500,
+    consensus_runs: int = 1,
     n_cpus: int = None,
 ) -> tuple[DataFrame, RectangleSignatureResult]:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
@@ -47,10 +49,12 @@ def rectangle(
         todo
     correct_mrna_bias : bool, optional
         A flag indicating whether to correct for mRNA bias. Defaults to True.
-    balance_sc_data : bool, optional
+    subsample : bool, optional
         A flag indicating whether to balance the single-cell data. Defaults to False.
-    balance_number : int, optional
+    sample_size : int, optional
         The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
+    consensus_runs : int
+        The number of consensus runs to perform. Defaults to 1 for a singular deconvolution run. Consensus runs are performed by subsampling the single-cell data and running the analysis multiple times.
 
     Returns
     -------
@@ -65,22 +69,32 @@ def rectangle(
         adata = adata[:, genes]
         bulks = bulks[genes]
 
-    signatures = build_rectangle_signatures(
-        adata,
-        cell_type_col,
-        bulks=bulks,
-        optimize_cutoffs=optimize_cutoffs,
-        layer=layer,
-        raw=raw,
-        p=p,
-        lfc=lfc,
-        n_cpus=n_cpus,
-        balance_sc_data=balance_sc_data,
-        balance_number=balance_number,
-    )
-    cell_fractions = deconvolution(signatures, bulks, correct_mrna_bias, n_cpus)
+    if consensus_runs > 1:
+        logger.info(f"Running {consensus_runs} consensus runs with subsample size {sample_size}")
+        subsample = True
 
-    return cell_fractions, signatures
+    estimations = []
+    most_recent_signatures = None
+
+    for _i in range(consensus_runs):
+        signatures = build_rectangle_signatures(
+            adata,
+            cell_type_col,
+            bulks=bulks,
+            optimize_cutoffs=optimize_cutoffs,
+            layer=layer,
+            raw=raw,
+            p=p,
+            lfc=lfc,
+            n_cpus=n_cpus,
+            subsample=subsample,
+            sample_size=sample_size,
+        )
+        cell_fractions = deconvolution(signatures, bulks, correct_mrna_bias, n_cpus)
+        estimations.append(cell_fractions)
+        most_recent_signatures = signatures
+
+    return pd.concat(estimations).groupby(level=0).median(), most_recent_signatures
 
 
 def load_tutorial_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
