@@ -77,6 +77,7 @@ def rectangle(
     most_recent_signatures = None
 
     for _i in range(consensus_runs):
+        logger.info(f"Running consensus run {_i + 1} of {consensus_runs}")
         signatures = build_rectangle_signatures(
             adata,
             cell_type_col,
