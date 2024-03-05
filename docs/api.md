@@ -1,6 +1,6 @@
 # API
 
-## Preprocessing
+## Rectangle
 
 ```{eval-rst}
 .. currentmodule:: rectanglepy
@@ -8,9 +8,21 @@
 .. autosummary::
     :toctree: generated
 
-    pp.build_rectangle_signatures
-    pp.RectangleSignatureResult
-    pp.load_tutorial_sc_data
+    rectangle
+.. automodule:: rectanglepy
+    :members:
+```
+
+## Preprocessing
+
+```{eval-rst}
+.. currentmodule:: rectanglepy.pp
+
+.. autosummary::
+    :toctree: generated
+
+    build_rectangle_signatures
+    RectangleSignatureResult
 .. automodule:: rectanglepy.pp
     :members:
 ```
@@ -18,12 +30,12 @@
 ## Tools
 
 ```{eval-rst}
-.. currentmodule:: rectanglepy
+.. currentmodule:: rectanglepy.tl
 
 .. autosummary::
     :toctree: generated
 
-    tl.deconvolution
+    deconvolution
 
 .. automodule:: rectanglepy.tl
     :members:

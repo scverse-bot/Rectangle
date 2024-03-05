@@ -15,13 +15,13 @@ def rectangle(
     *,
     layer: str = None,
     raw: bool = False,
+    subsample: bool = False,
+    sample_size: int = 1500,
+    consensus_runs: int = 1,
     correct_mrna_bias: bool = True,
     optimize_cutoffs=True,
     p=0.015,
     lfc=1.5,
-    subsample: bool = False,
-    sample_size: int = 1500,
-    consensus_runs: int = 1,
     n_cpus: int = None,
 ) -> tuple[DataFrame, RectangleSignatureResult]:
     r"""Builds rectangle signatures based on single-cell  count data and annotations.
@@ -30,31 +30,30 @@ def rectangle(
     ----------
     adata
         The single-cell count data as a DataFrame. DataFrame must have the genes as index and cell identifier as columns. Each entry should be in raw counts.
+    bulks
+        The bulk data as a DataFrame. DataFrame must have the bulk identifier as index and the genes as columns. Each entry should be in transcripts per million (TPM).
     cell_type_col
         The annotations corresponding to the single-cell count data. Series data should have the cell identifier as index and the annotations as values.
+    layer
+        The Anndata layer to use for the single-cell data. Defaults to None.
+    raw
+        A flag indicating whether to use the raw Anndata data. Defaults to False.
+    subsample : bool, optional
+        A flag indicating whether to balance the single-cell data. Defaults to False.
+    sample_size : int, optional
+        The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
+    consensus_runs : int
+        The number of consensus runs to perform. Defaults to 1 for a singular deconvolution run. Consensus runs are performed by subsampling the single-cell data and running the analysis multiple times. The results are then aggregated.
     optimize_cutoffs
         Indicates whether to optimize the p-value and log fold change cutoffs using gridsearch. Defaults to True.
     p
         The p-value threshold for the DE analysis (only used if optimize_cutoffs is False).
     lfc
         The log fold change threshold for the DE analysis (only used if optimize_cutoffs is False).
-    bulks
-        todo
     n_cpus
         The number of cpus to use for the DE analysis. Defaults to the number of cpus available.
-
-    layer
-        todo
-    raw
-        todo
     correct_mrna_bias : bool, optional
         A flag indicating whether to correct for mRNA bias. Defaults to True.
-    subsample : bool, optional
-        A flag indicating whether to balance the single-cell data. Defaults to False.
-    sample_size : int, optional
-        The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
-    consensus_runs : int
-        The number of consensus runs to perform. Defaults to 1 for a singular deconvolution run. Consensus runs are performed by subsampling the single-cell data and running the analysis multiple times.
 
     Returns
     -------

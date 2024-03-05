@@ -252,28 +252,26 @@ def build_rectangle_signatures(
     ----------
     adata
         The single-cell count data as a DataFrame. DataFrame must have the genes as index and cell identifier as columns. Each entry should be in raw counts.
+    bulks
+        The bulk data as a DataFrame. DataFrame must have the bulk identifier as index and the genes as columns. Each entry should be in transcripts per million (TPM).
     cell_type_col
         The annotations corresponding to the single-cell count data. Series data should have the cell identifier as index and the annotations as values.
+    layer
+        The Anndata layer to use for the single-cell data. Defaults to None.
+    raw
+        A flag indicating whether to use the raw Anndata data. Defaults to False.
+    subsample : bool, optional
+        A flag indicating whether to balance the single-cell data. Defaults to False.
+    sample_size : int, optional
+        The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
     optimize_cutoffs
         Indicates whether to optimize the p-value and log fold change cutoffs using gridsearch. Defaults to True.
     p
         The p-value threshold for the DE analysis (only used if optimize_cutoffs is False).
     lfc
         The log fold change threshold for the DE analysis (only used if optimize_cutoffs is False).
-    bulks: pd.DataFrame
-        The tpm normalized bulk data for deconvolution. Rows are samples and columns are genes.
     n_cpus
         The number of cpus to use for the DE analysis. Defaults to the number of cpus available.
-
-    layer
-        todo
-    raw
-        todo
-    subsample : bool, optional
-        A flag indicating whether to evenly subsample the single-cell data. Defaults to False.
-    sample_size : int, optional
-        The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
-
 
     Returns
     -------

@@ -23,7 +23,7 @@ Please refer to the [documentation][link-docs]. In particular, the
 You need to have Python 3.10 or newer installed on your system. If you don't have
 Python installed, we recommend installing [Mambaforge](https://github.com/conda-forge/miniforge#mambaforge).
 
-There are several alternative options to install Rectangle:
+How to install Rectangle:
 
 <!--
 1) Install the latest release of `Rectangle` from `PyPI <https://pypi.org/project/rectanglepy/>`_:
@@ -32,12 +32,6 @@ There are several alternative options to install Rectangle:
 pip install rectanglepy
 ```
 -->
-
-1. Install the latest development version:
-
-```bash
-pip install git+https://github.com/ComputationalBiomedicineGroup/Rectangle.git@main
-```
 
 ## Release notes
 

@@ -9,7 +9,6 @@
 api.md
 notebooks/example
 changelog.md
-template_usage.md
 contributing.md
 references.md
 
