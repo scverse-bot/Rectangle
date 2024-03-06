@@ -260,9 +260,9 @@ def build_rectangle_signatures(
         The Anndata layer to use for the single-cell data. Defaults to None.
     raw
         A flag indicating whether to use the raw Anndata data. Defaults to False.
-    subsample : bool, optional
+    subsample : bool
         A flag indicating whether to balance the single-cell data. Defaults to False.
-    sample_size : int, optional
+    sample_size : int
         The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
     optimize_cutoffs
         Indicates whether to optimize the p-value and log fold change cutoffs using gridsearch. Defaults to True.

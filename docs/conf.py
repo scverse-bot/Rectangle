@@ -114,13 +114,15 @@ html_theme_options = {
     "path_to_docs": "docs/",
 }
 
-pygments_style = "default"
+pygments_style = "emacs"
 
 nitpick_ignore = [
     # If building the documentation fails because of a missing link that is outside your control,
     # you can add an exception to this list.
     #     ("py:class", "igraph.Graph"),
 ]
+
+print("Pygments style:", pygments_style)
 
 
 def setup(app):

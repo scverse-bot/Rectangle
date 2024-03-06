@@ -24,7 +24,7 @@ def rectangle(
     lfc=1.5,
     n_cpus: int = None,
 ) -> tuple[DataFrame, RectangleSignatureResult]:
-    r"""Builds rectangle signatures based on single-cell  count data and annotations.
+    r"""All in one deconvolution method. Creates signatures and deconvolutes the bulk data. Has options for subsampling and consensus runs.
 
     Parameters
     ----------
@@ -38,9 +38,9 @@ def rectangle(
         The Anndata layer to use for the single-cell data. Defaults to None.
     raw
         A flag indicating whether to use the raw Anndata data. Defaults to False.
-    subsample : bool, optional
+    subsample : bool
         A flag indicating whether to balance the single-cell data. Defaults to False.
-    sample_size : int, optional
+    sample_size : int
         The number of cells to balance the single-cell data to. Defaults to 1500. If cell number is less than this number it takes the original number of cells.
     consensus_runs : int
         The number of consensus runs to perform. Defaults to 1 for a singular deconvolution run. Consensus runs are performed by subsampling the single-cell data and running the analysis multiple times. The results are then aggregated.
@@ -52,12 +52,13 @@ def rectangle(
         The log fold change threshold for the DE analysis (only used if optimize_cutoffs is False).
     n_cpus
         The number of cpus to use for the DE analysis. Defaults to the number of cpus available.
-    correct_mrna_bias : bool, optional
+    correct_mrna_bias : bool
         A flag indicating whether to correct for mRNA bias. Defaults to True.
 
     Returns
     -------
-    The result of the rectangle signature analysis which is of type RectangleSignatureResult.
+    DataFrame : The estimated cell fractions.
+    RectangleSignatureResult : The result of the rectangle signature analysis.
     """
     assert isinstance(adata, AnnData), "adata must be an AnnData object"
     assert isinstance(bulks, DataFrame), "bulks must be a DataFrame"

@@ -1,6 +1,5 @@
 import math
 import multiprocessing
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -20,10 +19,10 @@ def _scale_weights(weights: np.ndarray) -> np.ndarray:
 def solve_qp(
     signature: pd.DataFrame,
     bulk: pd.Series,
-    prev_assignments: Optional[list[int or str]] = None,
-    prev_solution: Optional[pd.Series] = None,
-    gld: Optional[np.ndarray] = None,
-    multiplier: Optional[int] = None,
+    prev_assignments: list[int or str] = None,
+    prev_solution: pd.Series = None,
+    gld: np.ndarray = None,
+    multiplier: int = None,
 ) -> np.ndarray:
     """Performs quadratic programming optimization to solve the deconvolution problem.
 
@@ -33,13 +32,13 @@ def solve_qp(
         The signature matrix for deconvolution. Each row represents a gene and each column represents a cell type.
     bulk : pd.Series
         The bulk data for deconvolution. Each entry represents the expression level of a gene.
-    prev_assignments : Optional[list[int or str]], default is None
+    prev_assignments : default is None
         A list of previous assignments of cell types to genes. If provided, the function will use these assignments as additional QP constraints.
-    prev_solution : Optional[pd.Series], default is None
+    prev_solution : default is None
         A series of previous solution for each cell type. If provided, the function will use the prev solution as additional QP constraints..
-    gld : Optional[np.ndarray], default is None
+    gld :  default is None
         An array of gene length data. If provided, the function will use this data to adjust the weights.
-    multiplier : Optional[int], default is None
+    multiplier :  default is None
         A multiplier for the weights. If provided, the function will use this multiplier to adjust the weights.
 
     Returns
@@ -127,8 +126,8 @@ def _find_dampening_constant(signature: pd.DataFrame, bulk: pd.Series, qp_gld: n
 def _calculate_dwls(
     signature: pd.DataFrame,
     bulk: pd.Series,
-    prev_assignments: Optional[list[int or str]] = None,
-    prev_weights: Optional[pd.Series] = None,
+    prev_assignments: list[int or str] = None,
+    prev_weights: pd.Series = None,
 ) -> pd.Series:
     genes = list(set(signature.index) & set(bulk.index))
     signature = signature.loc[genes].sort_index()
@@ -161,7 +160,7 @@ def deconvolution(
     signatures: RectangleSignatureResult,
     bulks: pd.DataFrame,
     correct_mrna_bias: bool = True,
-    n_cpus: Optional[int] = None,
+    n_cpus: int = None,
 ) -> pd.DataFrame:
     """Performs recursive deconvolution using rectangle signatures and bulk data.
 
@@ -169,16 +168,15 @@ def deconvolution(
     ----------
     signatures : RectangleSignatureResult
         The rectangle signature result containing the signature data and results.
-    bulks : pd.DataFrame
+    bulks : pandas.DataFrame
         The tpm normalized bulk data for deconvolution. Rows are samples and columns are genes.
-    correct_mrna_bias : bool, optional
+    correct_mrna_bias : bool
         A flag indicating whether to correct for mRNA bias. Defaults to True.
-    n_cpus : int, optional
+    n_cpus : int
         The number of CPUs to use for parallel processing. If not provided, the function will use all available CPUs. Each CPU will process a bulk sample.
 
     Returns
     -------
-    pd.DataFrame
         A DataFrame containing the estimated cell fractions resulting from deconvolution. Each row represents a sample and each column represents a cell type.
 
     """
