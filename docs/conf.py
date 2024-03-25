@@ -34,7 +34,7 @@ needs_sphinx = "4.0"
 html_context = {
     "display_github": True,  # Integrate GitHub
     "github_user": "ComputationalBiomedicineGroup",  # Username
-    "github_repo": "rectangle",  # Repo name
+    "github_repo": "Rectangle",  # Repo name
     "github_version": "main",  # Version
     "conf_py_path": "/docs/",  # Path in the checkout to the docs root
 }

@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning][].
 
 ## [Unreleased]
 
+## [0.1.0] - 2024-04-25
+
 ### Added
 
--   Basic tool, preprocessing and plotting functions
+-   Initial public release of Rectangle.

@@ -3,9 +3,9 @@
 [![Tests][badge-tests]][link-tests]
 [![Documentation][badge-docs]][link-docs]
 
-[badge-tests]: https://img.shields.io/github/actions/workflow/status/bernheder/Rectangle/test.yaml?branch=main
+[badge-tests]: https://img.shields.io/github/actions/workflow/status/ComputationalBiomedicineGroup/Rectangle/build.yaml?branch=main
 [link-tests]: https://github.com/ComputationalBiomedicineGroup/Rectangle/actions/workflows/build.yaml
-[badge-docs]: https://img.shields.io/readthedocs/Rectangle
+[badge-docs]: https://img.shields.io/readthedocs/rectanglepy
 
 Rectangle embodies a ”second-generation” deconvolution methodology, setting itself apart from other second-generation
 methods through its efficiency in signature creation and its handling of challenges within the deconvolution process.
