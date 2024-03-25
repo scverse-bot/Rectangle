@@ -5,7 +5,7 @@ requires = ["hatchling"]
 [project]
 name = "rectanglepy"
 version = "0.0.43"
-description = "A very interesting piece of code"
+description = "Hierarchical deconvolution of bulk  transcriptomics"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -16,8 +16,8 @@ maintainers = [
     {name = "Bernhard Eder", email = "Bernhard.Eder@student.uibk.ac.at"},
 ]
 urls.Documentation = "https://rectanglepy.readthedocs.io/"
-urls.Source = "https://github.com/bernheder/Rectangle"
-urls.Home-page = "https://github.com/bernheder/Rectangle"
+urls.Source = "https://github.com/ComputationalBiomedicineGroup/Rectangle"
+urls.Home-page = "https://github.com/ComputationalBiomedicineGroup/Rectangle"
 dependencies = [
     "pydeseq2==0.4.1",
     "quadprog==0.1.11",

@@ -10,7 +10,7 @@
             "author_full_name": "Bernhard Eder",
             "author_email": "yourname@example.com",
             "github_user": "bernheder",
-            "project_repo": "https://github.com/bernheder/Rectangle",
+            "project_repo": "https://github.com/ComputationalBiomedicineGroup/Rectangle",
             "license": "MIT License",
             "_copy_without_render": [
                 ".github/workflows/**.yaml",

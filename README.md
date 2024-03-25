@@ -4,7 +4,7 @@
 [![Documentation][badge-docs]][link-docs]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/bernheder/Rectangle/test.yaml?branch=main
-[link-tests]: https://github.com/bernheder/Rectangle/actions/workflows/test.yml
+[link-tests]: https://github.com/ComputationalBiomedicineGroup/Rectangle/actions/workflows/test.yml
 [badge-docs]: https://img.shields.io/readthedocs/Rectangle
 
 Rectangle embodies a ”second-generation” deconvolution methodology, setting itself apart from other second-generation
@@ -25,13 +25,11 @@ Python installed, we recommend installing [Mambaforge](https://github.com/conda-
 
 How to install Rectangle:
 
-<!--
-1) Install the latest release of `Rectangle` from `PyPI <https://pypi.org/project/rectanglepy/>`_:
+Install the latest release of `Rectangle` from `PyPI <https://pypi.org/project/rectanglepy/>`:
 
 ```bash
 pip install rectanglepy
 ```
--->
 
 ## Release notes
 
@@ -46,7 +44,7 @@ If you found a bug, please use the [issue tracker][issue-tracker].
 > t.b.a
 
 [scverse-discourse]: https://discourse.scverse.org/
-[issue-tracker]: https://github.com/bernheder/Rectangle/issues
+[issue-tracker]: https://github.com/ComputationalBiomedicineGroup/Rectangle/issues
 [changelog]: https://Rectanglepy.readthedocs.io/latest/changelog.html
 [link-docs]: https://Rectanglepy.readthedocs.io
 [link-api]: https://Rectanglepy.readthedocs.io/latest/api.html

@@ -16,12 +16,12 @@ sys.path.insert(0, str(HERE / "extensions"))
 
 # -- Project information -----------------------------------------------------
 
-info = metadata("rectanglepy")
+info = metadata("rectangle")
 project_name = info["Name"]
 author = info["Author"]
 copyright = f"{datetime.now():%Y}, {author}."
 version = info["Version"]
-repository_url = f"https://github.com/bernheder/{project_name}"
+repository_url = "https://github.com/ComputationalBiomedicineGroup/Rectangle"
 
 # The full version, including alpha/beta/rc tags
 release = info["Version"]
