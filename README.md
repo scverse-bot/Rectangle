@@ -45,6 +45,6 @@ If you found a bug, please use the [issue tracker][issue-tracker].
 
 [scverse-discourse]: https://discourse.scverse.org/
 [issue-tracker]: https://github.com/ComputationalBiomedicineGroup/Rectangle/issues
-[changelog]: https://Rectanglepy.readthedocs.io/latest/changelog.html
+[changelog]: https://rectanglepy.readthedocs.io/changelog.html
 [link-docs]: https://Rectanglepy.readthedocs.io
 [link-api]: https://rectanglepy.readthedocs.io/api.html

@@ -105,13 +105,13 @@ def load_tutorial_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     -------
     The single-cell count data, annotations, and bulk data.
     """
-    with resource_stream(__name__, "data/hao1_annotations_small.csv") as annotations_file:
-        annotations = pd.read_csv(annotations_file, index_col=0)["0"]
+    with resource_stream(__name__, "data/hao1_annotations_small.zip") as annotations_file:
+        annotations = pd.read_csv(annotations_file, index_col=0, compression="zip")["0"]
 
-    with resource_stream(__name__, "data/hao1_counts_small.csv") as counts_file:
-        sc_counts = pd.read_csv(counts_file, index_col=0).astype("int")
+    with resource_stream(__name__, "data/hao1_counts_small.zip") as counts_file:
+        sc_counts = pd.read_csv(counts_file, index_col=0, compression="zip").astype("int")
 
-    with resource_stream(__name__, "data/small_fino_bulks.csv") as bulks_file:
-        bulks = pd.read_csv(bulks_file, index_col=0)
+    with resource_stream(__name__, "data/small_fino_bulks.zip") as bulks_file:
+        bulks = pd.read_csv(bulks_file, index_col=0, compression="zip")
 
     return sc_counts.T, annotations, bulks.T
