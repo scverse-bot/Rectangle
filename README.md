@@ -47,4 +47,4 @@ If you found a bug, please use the [issue tracker][issue-tracker].
 [issue-tracker]: https://github.com/ComputationalBiomedicineGroup/Rectangle/issues
 [changelog]: https://Rectanglepy.readthedocs.io/latest/changelog.html
 [link-docs]: https://Rectanglepy.readthedocs.io
-[link-api]: https://Rectanglepy.readthedocs.io/latest/api.html
+[link-api]: https://rectanglepy.readthedocs.io/latest/api.html

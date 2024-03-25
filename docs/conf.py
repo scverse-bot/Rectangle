@@ -16,7 +16,7 @@ sys.path.insert(0, str(HERE / "extensions"))
 
 # -- Project information -----------------------------------------------------
 
-info = metadata("rectangle")
+info = metadata("rectanglepy")
 project_name = info["Name"]
 author = info["Author"]
 copyright = f"{datetime.now():%Y}, {author}."
@@ -33,8 +33,8 @@ needs_sphinx = "4.0"
 
 html_context = {
     "display_github": True,  # Integrate GitHub
-    "github_user": "bernheder",  # Username
-    "github_repo": project_name,  # Repo name
+    "github_user": "ComputationalBiomedicineGroup",  # Username
+    "github_repo": "rectangle",  # Repo name
     "github_version": "main",  # Version
     "conf_py_path": "/docs/",  # Path in the checkout to the docs root
 }
@@ -106,7 +106,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 #
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-html_title = project_name
+html_title = "rectangle"
 
 html_theme_options = {
     "repository_url": repository_url,
