@@ -4,7 +4,7 @@
 [![Documentation][badge-docs]][link-docs]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/bernheder/Rectangle/test.yaml?branch=main
-[link-tests]: https://github.com/ComputationalBiomedicineGroup/Rectangle/actions/workflows/test.yml
+[link-tests]: https://github.com/ComputationalBiomedicineGroup/Rectangle/actions/workflows/build.yaml
 [badge-docs]: https://img.shields.io/readthedocs/Rectangle
 
 Rectangle embodies a ”second-generation” deconvolution methodology, setting itself apart from other second-generation
@@ -47,4 +47,4 @@ If you found a bug, please use the [issue tracker][issue-tracker].
 [issue-tracker]: https://github.com/ComputationalBiomedicineGroup/Rectangle/issues
 [changelog]: https://Rectanglepy.readthedocs.io/latest/changelog.html
 [link-docs]: https://Rectanglepy.readthedocs.io
-[link-api]: https://rectanglepy.readthedocs.io/latest/api.html
+[link-api]: https://rectanglepy.readthedocs.io/api.html
