@@ -142,8 +142,6 @@ def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, p
         clinical_df = pd.DataFrame({"condition": condition}, index=countsig.columns)
         dds = DeseqDataSet(counts=count_df, metadata=clinical_df, design_factors="condition", quiet=True, n_cpus=n_cpus)
         dds.deseq2()
-        dds.varm["LFC"] = dds.varm["LFC"].round(4)
-        dds.varm["dispersions"] = dds.varm["dispersions"].round(3)
 
         stat_res = DeseqStats(dds, n_cpus=n_cpus, quiet=True)
         stat_res.summary(quiet=True)
