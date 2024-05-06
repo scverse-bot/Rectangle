@@ -155,7 +155,7 @@ def _run_deseq2(countsig: pd.DataFrame, n_cpus: int = None) -> dict[str | int, p
 
 def _de_analysis(
     pseudo_count_sig, sc_data, annotations, p, lfc, optimize_cutoffs: bool, n_cpus: int = None, genes=None
-) -> tuple[Series, dict[str, int] :, DataFrame | None]:
+) -> tuple[Series, dict[str, [str]] :, DataFrame | None]:
     logger.info("Starting DE analysis")
     deseq_results = _run_deseq2(pseudo_count_sig, n_cpus)
     optimization_results = None
@@ -185,14 +185,15 @@ def _get_marker_genes(deseq_results, logfc, p, pseudo_count_sig):
     optimal_condition_matrix = condition_number_matrices[optimal_condition_index]
 
     markers = optimal_condition_matrix.index
-    marker_genes_per_cell_type = _count_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_number)
+    marker_genes_per_cell_type = _get_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_number)
     return markers, marker_genes_per_cell_type
 
 
-def _count_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_number: int) -> dict[str, int]:
+def _get_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_number: int) -> dict[str, [str]]:
     marker_genes_per_cell_type = {}
     for annotation, result in de_analysis_adjusted.items():
-        marker_genes_per_cell_type[annotation] = min(len(result), optimal_condition_number)
+        number_of_genes = min(len(result), optimal_condition_number)
+        marker_genes_per_cell_type[annotation] = list(result.index[0:number_of_genes])
     logger.info(f"Number of marker genes per cell type: {str(marker_genes_per_cell_type)}")
     return marker_genes_per_cell_type
 
@@ -323,7 +324,9 @@ def build_rectangle_signatures(
         )
 
     clustered_biasfact = _create_bias_factors(clustered_signature, sc_counts, clustered_annotations)
-    clustered_genes = _de_analysis(clustered_signature, sc_counts, clustered_annotations, p, lfc, False)[0]
+    clustered_genes, clustered_marker_genes_per_cell_type, _ = _de_analysis(
+        clustered_signature, sc_counts, clustered_annotations, p, lfc, False
+    )
     clustered_signature = _convert_to_cpm(clustered_signature)
     return RectangleSignatureResult(
         signature_genes=marker_genes,
@@ -335,6 +338,7 @@ def build_rectangle_signatures(
         clustered_signature_genes=clustered_genes,
         clustered_bias_factors=clustered_biasfact,
         cluster_assignments=assignments,
+        marker_genes_per_cluster=clustered_marker_genes_per_cell_type,
     )
 
 
