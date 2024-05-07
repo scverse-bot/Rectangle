@@ -194,7 +194,6 @@ def _get_marker_genes_per_cell_type(de_analysis_adjusted, optimal_condition_numb
     for annotation, result in de_analysis_adjusted.items():
         number_of_genes = min(len(result), optimal_condition_number)
         marker_genes_per_cell_type[annotation] = list(result.index[0:number_of_genes])
-    logger.info(f"Number of marker genes per cell type: {str(marker_genes_per_cell_type)}")
     return marker_genes_per_cell_type
 
 
