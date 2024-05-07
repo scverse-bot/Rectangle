@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning][].
 
 ## [Unreleased]
 
+## [0.1.6] - 2024-05-07
+
+### Added
+
+-   Added consenus method to Rectangle
+-   RectangleSignatureResult now contains list of marker genes per cell type / cluster
+
 ## [0.1.0] - 2024-04-25
 
 ### Added
