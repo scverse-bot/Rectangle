@@ -29,37 +29,24 @@ class RectangleSignatureResult:
         signature_genes: pd.Series,
         bias_factors: pd.Series,
         pseudobulk_sig_cpm: pd.DataFrame,
-        marker_genes_per_cell_type: dict[str, int],
+        marker_genes_per_cell_type: dict[str, [str]],
         optimization_result: pd.DataFrame = None,
         clustered_pseudobulk_sig_cpm: pd.DataFrame = None,
         clustered_bias_factors: pd.Series = None,
+        marker_genes_per_cluster: dict[str, [str]] = None,
         clustered_signature_genes: pd.Series = None,
         cluster_assignments: list[int or str] = None,
     ):
         self.signature_genes = signature_genes
         self.bias_factors = bias_factors
         self.pseudobulk_sig_cpm = pseudobulk_sig_cpm
+        self.marker_genes_per_cluster = marker_genes_per_cluster
         self.marker_genes_per_cell_type = marker_genes_per_cell_type
         self.optimization_result = optimization_result
         self.clustered_pseudobulk_sig_cpm = clustered_pseudobulk_sig_cpm
         self.clustered_bias_factors = clustered_bias_factors
         self.clustered_signature_genes = clustered_signature_genes
         self.assignments = cluster_assignments
-
-    def cell_types_with_low_number_of_marker_genes(self) -> list[str]:
-        """Returns the cell types with less than threshold marker genes.
-
-        Returns
-        -------
-        list[str]: The cell types with less than threshold marker genes.
-
-        """
-        low_annotation_threshold = 30
-        return [
-            cell_type
-            for cell_type, count in self.marker_genes_per_cell_type.items()
-            if count < low_annotation_threshold
-        ]
 
     def get_signature_matrix(self, include_mrna_bias=True) -> pd.DataFrame:
         """Calculates the signature matrix by multiplying the pseudobulk_sig_cpm DataFrame subset by signature_genes and the bias_factors Series.

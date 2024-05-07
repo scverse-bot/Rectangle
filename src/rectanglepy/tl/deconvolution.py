@@ -257,7 +257,14 @@ def _deconvolute(signatures: RectangleSignatureResult, bulk: pd.Series, correct_
     averaged_start_fractions = (start_fractions + union_direct_fraction) / 2
 
     final_fractions = []
-    cell_types_with_low_number_of_marker_genes = signatures.cell_types_with_low_number_of_marker_genes()
+
+    low_number_threshold = 30
+    cell_types_with_low_number_of_marker_genes = [
+        cell_type
+        for cell_type, num_marker_genes in signatures.marker_genes_per_cell_type.items()
+        if len(num_marker_genes) < low_number_threshold
+    ]
+
     for cell_type in list(averaged_start_fractions.index):
         if cell_type in cell_types_with_low_number_of_marker_genes:
             final_fractions.append(recursive_fractions[cell_type])
