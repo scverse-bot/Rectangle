@@ -8,8 +8,10 @@
 .. autosummary::
     :toctree: generated
 
-    rectangle
-    pp.build_rectangle_signatures
-    pp.RectangleSignatureResult
-    tl.deconvolution
+    rectanglepy.rectangle
+    rectanglepy.rectangle_consens
+    rectanglepy.pp.build_rectangle_signatures
+    rectanglepy.tl.deconvolution
+    rectanglepy.pp.RectangleSignatureResult
+    rectanglepy.ConsensusResult
 ```
